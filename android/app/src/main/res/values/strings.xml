@@ -6,10 +6,10 @@
     <string name="tab_record">Record</string>
     <string name="tab_settings">Settings</string>
 
-    <string name="map_no_data">Road colors will appear here as drivers contribute data.</string>
+    <string name="map_no_data">Record a drive to see road quality here. The shared map with everyone\'s drives comes next.</string>
 
     <string name="record_title">Drive recorder</string>
-    <string name="record_description">Records motion sensors and GPS while you drive. The recordings are used to tune pothole and speed bump detection. Mount the phone in a holder before starting.</string>
+    <string name="record_description">Drive with the phone in a holder. BumpMap measures how much the car shakes, rates each stretch of road and detects potholes and speed bumps automatically.</string>
     <string name="record_start">Start recording</string>
     <string name="record_stop">Stop recording</string>
     <string name="record_status_idle">Not recording</string>
@@ -25,7 +25,16 @@
         <item quantity="other">%d marks</item>
     </plurals>
 
-    <string name="mark_section">Mark what you just drove over (passenger)</string>
+    <string name="record_quality">Road quality: %1$s (%2$d/100)</string>
+    <string name="record_quality_waiting">Road quality: drive above 12 km/h…</string>
+    <string name="record_potholes">Potholes detected: %1$d</string>
+    <string name="record_bumps">Speed bumps detected: %1$d</string>
+    <string name="quality_good">Good</string>
+    <string name="quality_fair">Fair</string>
+    <string name="quality_poor">Poor</string>
+    <string name="quality_bad">Very bad</string>
+
+    <string name="mark_section">Optional: mark what you drove over (helps calibrate detection)</string>
     <string name="mark_bump">Speed bump</string>
     <string name="mark_pothole">Pothole</string>
     <string name="mark_rough">Rough pavement</string>
