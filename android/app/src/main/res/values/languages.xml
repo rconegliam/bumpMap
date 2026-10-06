@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Language names are always shown in their own language. -->
+<resources>
+    <string name="language_english" translatable="false">English</string>
+    <string name="language_portuguese" translatable="false">Português (Brasil)</string>
+</resources>
