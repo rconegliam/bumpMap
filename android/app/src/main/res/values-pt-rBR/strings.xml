@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BumpMap</string>
+
+    <string name="tab_map">Mapa</string>
+    <string name="tab_record">Gravar</string>
+    <string name="tab_settings">Configurações</string>
+
+    <string name="map_no_data">As cores das vias aparecerão aqui conforme os motoristas contribuírem com dados.</string>
+
+    <string name="record_title">Gravador de trajeto</string>
+    <string name="record_description">Grava os sensores de movimento e o GPS enquanto você dirige. As gravações são usadas para calibrar a detecção de buracos e lombadas. Prenda o celular em um suporte antes de começar.</string>
+    <string name="record_start">Iniciar gravação</string>
+    <string name="record_stop">Parar gravação</string>
+    <string name="record_status_idle">Sem gravação</string>
+    <string name="record_status_recording">Gravando</string>
+    <string name="record_elapsed">Tempo: %1$s</string>
+    <string name="record_speed">Velocidade: %1$s km/h</string>
+    <string name="record_speed_unknown">Velocidade: aguardando GPS…</string>
+    <string name="record_gps_accuracy">Precisão do GPS: %1$s m</string>
+    <string name="record_shake">Trepidação vertical: %1$s m/s²</string>
+    <string name="record_samples">Amostras de sensores: %1$d</string>
+    <plurals name="record_marks">
+        <item quantity="one">%d marcação</item>
+        <item quantity="many">%d marcações</item>
+        <item quantity="other">%d marcações</item>
+    </plurals>
+
+    <string name="mark_section">Marque o que você acabou de passar (passageiro)</string>
+    <string name="mark_bump">Lombada</string>
+    <string name="mark_pothole">Buraco</string>
+    <string name="mark_rough">Pavimento ruim</string>
+
+    <string name="recordings_title">Gravações</string>
+    <string name="recordings_empty">Nenhuma gravação ainda.</string>
+    <string name="recording_share">Compartilhar</string>
+    <string name="recording_delete">Excluir</string>
+    <string name="recording_share_chooser">Compartilhar gravação</string>
+
+    <string name="permission_denied">A permissão de localização é necessária para gravar trajetos.</string>
+
+    <string name="notification_channel_name">Gravação de trajeto</string>
+    <string name="notification_title">BumpMap está gravando</string>
+    <string name="notification_text">Gravando a qualidade da via enquanto você dirige</string>
+    <string name="notification_stop">Parar</string>
+
+    <string name="settings_language">Idioma</string>
+    <string name="language_system">Padrão do sistema</string>
+    <string name="settings_about">Sobre</string>
+    <string name="settings_version">Versão %1$s</string>
+    <string name="settings_map_data">Dados do mapa © colaboradores do OpenStreetMap. Mapa base por OpenFreeMap.</string>
+</resources>
