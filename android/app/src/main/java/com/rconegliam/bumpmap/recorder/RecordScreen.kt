@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rconegliam.bumpmap.R
+import com.rconegliam.bumpmap.detection.labelRes
 import com.rconegliam.bumpmap.ui.currentLocale
 import kotlinx.coroutines.delay
 import java.io.File
@@ -175,6 +176,18 @@ private fun StatusCard(status: RecorderStatus) {
                 status.accuracyM?.let {
                     Text(stringResource(R.string.record_gps_accuracy, String.format(locale, "%.0f", it)))
                 }
+                val quality = status.roadQuality
+                val score = status.roadScore
+                Text(
+                    if (quality == null || score == null) {
+                        stringResource(R.string.record_quality_waiting)
+                    } else {
+                        stringResource(R.string.record_quality, stringResource(quality.labelRes), score)
+                    },
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(stringResource(R.string.record_potholes, status.potholes))
+                Text(stringResource(R.string.record_bumps, status.speedBumps))
                 Text(stringResource(R.string.record_shake, String.format(locale, "%.2f", status.shakeRms)))
                 Text(stringResource(R.string.record_samples, status.sensorSamples))
                 Text(pluralStringResource(R.plurals.record_marks, status.marks, status.marks))

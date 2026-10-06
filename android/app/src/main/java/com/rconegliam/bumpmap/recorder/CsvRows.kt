@@ -1,5 +1,7 @@
 package com.rconegliam.bumpmap.recorder
 
+import com.rconegliam.bumpmap.detection.RoadEvent
+
 enum class MarkType(val code: String) {
     SPEED_BUMP("bump"),
     POTHOLE("pothole"),
@@ -28,4 +30,7 @@ object CsvRows {
     ): String = "l,$tNs,$latitude,$longitude,$altitude,$speedMps,$bearing,$accuracyM"
 
     fun mark(tNs: Long, type: MarkType): String = "m,$tNs,${type.code}"
+
+    fun event(event: RoadEvent): String =
+        "e,${event.tNs},${event.type.code},${event.peak},${event.position.lat},${event.position.lon}"
 }

@@ -1,5 +1,8 @@
 package com.rconegliam.bumpmap.recorder
 
+import com.rconegliam.bumpmap.detection.EventType
+import com.rconegliam.bumpmap.detection.GeoPoint
+import com.rconegliam.bumpmap.detection.RoadEvent
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
@@ -51,5 +54,17 @@ class CsvRowsTest {
     @Test
     fun headerHasSixValueColumns() {
         assertEquals(8, CsvRows.HEADER.split(',').size)
+    }
+
+    @Test
+    fun eventRow() {
+        val event = RoadEvent(
+            type = EventType.SPEED_BUMP,
+            tNs = 42,
+            position = GeoPoint(-23.5, -46.8),
+            speedMps = 5.0,
+            peak = 2.5,
+        )
+        assertEquals("e,42,speed_bump,2.5,-23.5,-46.8", CsvRows.event(event))
     }
 }

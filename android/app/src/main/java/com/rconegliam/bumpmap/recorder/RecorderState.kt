@@ -1,5 +1,6 @@
 package com.rconegliam.bumpmap.recorder
 
+import com.rconegliam.bumpmap.detection.RoadQuality
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -15,6 +16,11 @@ data class RecorderStatus(
     val accuracyM: Float? = null,
     val shakeRms: Double = 0.0,
     val marks: Int = 0,
+    val potholes: Int = 0,
+    val speedBumps: Int = 0,
+    /** Score (0-100) and quality of the last rated stretch of road. */
+    val roadScore: Int? = null,
+    val roadQuality: RoadQuality? = null,
     /** Incremented every time a recording file is closed. */
     val finishedCount: Int = 0,
 )

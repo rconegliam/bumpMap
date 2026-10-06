@@ -6,10 +6,10 @@
     <string name="tab_record">Gravar</string>
     <string name="tab_settings">Configurações</string>
 
-    <string name="map_no_data">As cores das vias aparecerão aqui conforme os motoristas contribuírem com dados.</string>
+    <string name="map_no_data">Grave um trajeto para ver a qualidade das ruas aqui. O mapa compartilhado com os trajetos de todos vem em seguida.</string>
 
     <string name="record_title">Gravador de trajeto</string>
-    <string name="record_description">Grava os sensores de movimento e o GPS enquanto você dirige. As gravações são usadas para calibrar a detecção de buracos e lombadas. Prenda o celular em um suporte antes de começar.</string>
+    <string name="record_description">Dirija com o celular preso num suporte. O BumpMap mede o balanço do carro, dá uma nota para cada trecho da rua e detecta buracos e lombadas automaticamente.</string>
     <string name="record_start">Iniciar gravação</string>
     <string name="record_stop">Parar gravação</string>
     <string name="record_status_idle">Sem gravação</string>
@@ -26,7 +26,16 @@
         <item quantity="other">%d marcações</item>
     </plurals>
 
-    <string name="mark_section">Marque o que você acabou de passar (passageiro)</string>
+    <string name="record_quality">Qualidade da rua: %1$s (%2$d/100)</string>
+    <string name="record_quality_waiting">Qualidade da rua: dirija acima de 12 km/h…</string>
+    <string name="record_potholes">Buracos detectados: %1$d</string>
+    <string name="record_bumps">Lombadas detectadas: %1$d</string>
+    <string name="quality_good">Boa</string>
+    <string name="quality_fair">Regular</string>
+    <string name="quality_poor">Ruim</string>
+    <string name="quality_bad">Péssima</string>
+
+    <string name="mark_section">Opcional: marque o que você passou (ajuda a calibrar a detecção)</string>
     <string name="mark_bump">Lombada</string>
     <string name="mark_pothole">Buraco</string>
     <string name="mark_rough">Pavimento ruim</string>
