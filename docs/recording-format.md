@@ -31,6 +31,8 @@ While recording, `RoadAnalyzer` rates the road and detects events on the phone. 
 - `LineString` with `kind=segment`: about 25 m of road, with `quality` (`good`, `fair`, `poor`, `bad`), `score` (0-100), `roughness` and `speed_kmh`. Roughness is the vertical acceleration RMS scaled to 40 km/h: `rms * sqrt(40 km/h / speed)`. Movement below 12 km/h or a fix with accuracy worse than 25 m interrupts the segment. After the first zero-speed fix, stationary drift within the GPS accuracy does not affect the rating or move the line.
 - `Point` with `kind=event`: `type` (`pothole`, `speed_bump`), `peak` and `speed_kmh`. A speed bump is a slow heave: the 2 Hz low-passed vertical acceleration stays above 1.2 m/s² for at least 150 ms. A pothole is a sharp jolt: the high-passed signal goes above 4.5 m/s².
 
+An interruption can produce a shorter rated segment when the preceding stretch has enough motion samples. The line stops at the last measured point and resumes after the unrated interval.
+
 Automatic events require a GPS fix no older than 2 seconds with accuracy within 25 m. The detector checks the minimum speed of 7 km/h at the start of the jolt. The marker uses the position estimated at that moment. If GPS becomes stale or inaccurate before classification, the detector discards the event.
 
 All thresholds live in `DetectionConfig` and are first estimates, to be calibrated with real drives against the manual marks.

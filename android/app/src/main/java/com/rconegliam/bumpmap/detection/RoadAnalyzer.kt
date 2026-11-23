@@ -63,7 +63,7 @@ class RoadAnalyzer(
             this.speedMps = Double.NaN
             stoppedAt = null
             eventCandidate = null
-            resetSegment()
+            endSegment()
             return
         }
         val fixGapNs = tNs - lastFixNs
@@ -80,7 +80,7 @@ class RoadAnalyzer(
         lastFixNs = tNs
 
         if (previous == null) {
-            resetSegment()
+            endSegment()
             stoppedAt = point.takeIf { speedMps == 0.0 }
             return
         }
@@ -88,7 +88,7 @@ class RoadAnalyzer(
         if (speedMps == 0.0) {
             if (stop != null && Geo.distanceM(stop, point) <= accuracyM) return
             // A changed position on the first zero-speed fix can be braking distance.
-            if (stop != null || point != previous) resetSegment()
+            if (stop != null || point != previous) endSegment()
             stoppedAt = point
             return
         }
@@ -97,8 +97,8 @@ class RoadAnalyzer(
         val distance = Geo.distanceM(segmentStart, point)
         if (distance == 0.0) return
         if (!speed.isFinite() || speed < config.minSegmentSpeedMps) {
-            // Restart rather than drawing a line across unrated movement.
-            resetSegment()
+            // Keep the measured approach without drawing a line across unrated movement.
+            endSegment()
             return
         }
         if (segmentPoints.isEmpty()) segmentPoints.add(segmentStart)
@@ -108,13 +108,20 @@ class RoadAnalyzer(
         segmentSamples += samples
         segmentSpeedSum += speed
         segmentSpeedCount++
-        if (segmentLengthM >= config.segmentLengthM) {
-            closeSegment()
-            resetSegment()
-        }
+        if (segmentLengthM >= config.segmentLengthM) endSegment()
     }
 
-    private fun closeSegment() {
+    private fun endSegment() {
+        publishSegment()
+        segmentPoints.clear()
+        segmentLengthM = 0.0
+        segmentSumSquares = 0.0
+        segmentSamples = 0
+        segmentSpeedSum = 0.0
+        segmentSpeedCount = 0
+    }
+
+    private fun publishSegment() {
         if (segmentSpeedCount == 0 || segmentSamples < config.minSegmentSamples) return
         val meanSpeed = segmentSpeedSum / segmentSpeedCount
         val rms = sqrt(segmentSumSquares / segmentSamples)
@@ -130,15 +137,6 @@ class RoadAnalyzer(
                 quality = quality(roughness),
             ),
         )
-    }
-
-    private fun resetSegment() {
-        segmentPoints.clear()
-        segmentLengthM = 0.0
-        segmentSumSquares = 0.0
-        segmentSamples = 0
-        segmentSpeedSum = 0.0
-        segmentSpeedCount = 0
     }
 
     fun roughness(rms: Double, speedMps: Double): Double =
