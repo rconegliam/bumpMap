@@ -32,10 +32,7 @@ class RoadAnalyzer(
     private var lowPass = 0.0
     private var lastSampleNs = Long.MIN_VALUE
 
-    private var candidateStartNs = NO_CANDIDATE
-    private var candidateMaxHighPass = 0.0
-    private var candidateMaxLowPass = 0.0
-    private var candidateLowPassAboveNs = 0L
+    private var eventCandidate: EventCandidate? = null
     private var refractoryUntilNs = Long.MIN_VALUE
 
     fun onVertical(tNs: Long, verticalAcc: Double) {
@@ -57,15 +54,18 @@ class RoadAnalyzer(
         if (accuracyM.isNaN() || accuracyM > config.maxAccuracyM) {
             lastFix = null
             this.speedMps = Double.NaN
+            eventCandidate = null
             resetSegment(null)
             return
         }
         val previous = lastFix
-        val connected = previous != null && tNs - lastFixNs in 1..config.maxFixGapNs
+        val fixGapNs = tNs - lastFixNs
+        val connected = previous != null && fixGapNs in 1..config.maxFixGapNs
+        if (!connected || fixGapNs > config.maxExtrapolationNs) eventCandidate = null
         val distance = if (connected) Geo.distanceM(previous!!, point) else 0.0
         val speed = when {
             !speedMps.isNaN() -> speedMps
-            connected -> distance / ((tNs - lastFixNs) / 1e9)
+            connected -> distance / (fixGapNs / 1e9)
             else -> Double.NaN
         }
         this.speedMps = speed
@@ -139,45 +139,47 @@ class RoadAnalyzer(
      * for a while. A pothole is a sharp spike that the low-pass filter mostly removes.
      */
     private fun detectEvent(tNs: Long, dtNs: Long, highPass: Double) {
-        if (candidateStartNs == NO_CANDIDATE) {
-            val moving = !speedMps.isNaN() && speedMps >= config.minEventSpeedMps
-            if (!moving || tNs < refractoryUntilNs) return
-            if (abs(highPass) < config.potholeHighPass && abs(lowPass) < config.bumpLowPass) return
-            candidateStartNs = tNs
-            candidateMaxHighPass = 0.0
-            candidateMaxLowPass = 0.0
-            candidateLowPassAboveNs = 0L
+        val fix = lastFix
+        val fixAgeNs = tNs - lastFixNs
+        if (fix == null || fixAgeNs !in 0..config.maxExtrapolationNs ||
+            !speedMps.isFinite() || speedMps < config.minEventSpeedMps
+        ) {
+            eventCandidate = null
+            return
         }
-        candidateMaxHighPass = max(candidateMaxHighPass, abs(highPass))
-        candidateMaxLowPass = max(candidateMaxLowPass, abs(lowPass))
-        if (abs(lowPass) >= config.bumpLowPass) candidateLowPassAboveNs += dtNs
-        if (tNs - candidateStartNs < config.eventWindowNs) return
+        val candidate = eventCandidate ?: run {
+            if (tNs < refractoryUntilNs) return
+            if (abs(highPass) < config.potholeHighPass && abs(lowPass) < config.bumpLowPass) return
+            // Anchor the event when the jolt starts, before a newer fix can move its position.
+            val position = if (bearingDeg.isNaN() || fixAgeNs == 0L) fix
+                else Geo.destination(fix, bearingDeg, speedMps * fixAgeNs / 1e9)
+            EventCandidate(tNs, position, speedMps).also { eventCandidate = it }
+        }
+        candidate.maxHighPass = max(candidate.maxHighPass, abs(highPass))
+        candidate.maxLowPass = max(candidate.maxLowPass, abs(lowPass))
+        if (abs(lowPass) >= config.bumpLowPass) candidate.lowPassAboveNs += dtNs
+        if (tNs - candidate.startNs < config.eventWindowNs) return
 
         val type = when {
-            candidateLowPassAboveNs >= config.bumpMinDurationNs && speedMps <= config.maxBumpSpeedMps ->
+            candidate.lowPassAboveNs >= config.bumpMinDurationNs && candidate.speedMps <= config.maxBumpSpeedMps ->
                 EventType.SPEED_BUMP
-            candidateMaxHighPass >= config.potholeHighPass -> EventType.POTHOLE
+            candidate.maxHighPass >= config.potholeHighPass -> EventType.POTHOLE
             else -> null
         }
-        val eventNs = candidateStartNs
-        candidateStartNs = NO_CANDIDATE
-        val position = positionAt(eventNs)
-        if (type == null || position == null) return
+        eventCandidate = null
+        if (type == null) return
         refractoryUntilNs = tNs + config.refractoryNs
-        val peak = if (type == EventType.SPEED_BUMP) candidateMaxLowPass else candidateMaxHighPass
-        onEvent(RoadEvent(type, eventNs, position, speedMps, peak))
+        val peak = if (type == EventType.SPEED_BUMP) candidate.maxLowPass else candidate.maxHighPass
+        onEvent(RoadEvent(type, candidate.startNs, candidate.position, candidate.speedMps, peak))
     }
 
-    /** Last GPS fix moved forward along the bearing, since GPS only arrives once per second. */
-    private fun positionAt(tNs: Long): GeoPoint? {
-        val fix = lastFix ?: return null
-        val dtNs = (tNs - lastFixNs).coerceIn(0L, config.maxExtrapolationNs)
-        if (bearingDeg.isNaN() || speedMps.isNaN() || dtNs == 0L) return fix
-        return Geo.destination(fix, bearingDeg, speedMps * dtNs / 1e9)
+    private class EventCandidate(val startNs: Long, val position: GeoPoint, val speedMps: Double) {
+        var maxHighPass = 0.0
+        var maxLowPass = 0.0
+        var lowPassAboveNs = 0L
     }
 
     private companion object {
-        const val NO_CANDIDATE = -1L
         const val MAX_SAMPLE_GAP_NS = 100_000_000L
     }
 }

@@ -16,7 +16,13 @@ class RoadAnalyzerTest {
     private var travelledM = 0.0
 
     /** Drives north at [speedKmh] for [seconds], feeding 100 Hz vertical acceleration from [signal]. */
-    private fun drive(speedKmh: Double, seconds: Double, accuracyM: Double = 5.0, signal: (Double) -> Double) {
+    private fun drive(
+        speedKmh: Double,
+        seconds: Double,
+        accuracyM: Double = 5.0,
+        gpsAvailable: Boolean = true,
+        signal: (Double) -> Double,
+    ) {
         val speed = speedKmh / 3.6
         val steps = (seconds * 100).toInt()
         val startNs = tNs
@@ -24,7 +30,7 @@ class RoadAnalyzerTest {
             tNs += 10_000_000L
             travelledM += speed * 0.01
             analyzer.onVertical(tNs, signal((tNs - startNs) / 1e9))
-            if ((i + 1) % 100 == 0) {
+            if (gpsAvailable && (i + 1) % 100 == 0) {
                 val p = Geo.destination(start, 0.0, travelledM)
                 analyzer.onLocation(tNs, p.lat, p.lon, speed, 0.0, accuracyM)
             }
@@ -104,13 +110,41 @@ class RoadAnalyzerTest {
     }
 
     @Test
-    fun eventPositionIsAlongTheRoute() {
+    fun ignoresJoltsDuringGpsOutageAndResumesAfterFreshFix() {
+        drive(40.0, 3.0) { 0.0 }
+        drive(40.0, 4.0, gpsAvailable = false) { t -> if (t in 2.3..2.34) 9.0 else 0.0 }
+        assertTrue(events.isEmpty())
+
+        drive(40.0, 3.0) { t -> if (t in 1.5..1.54) 9.0 else 0.0 }
+        assertEquals(EventType.POTHOLE, events.single().type)
+    }
+
+    @Test
+    fun discardsCandidateIfFixExpiresBeforeClassification() {
+        drive(40.0, 3.0) { 0.0 }
+        drive(40.0, 3.0, gpsAvailable = false) { t -> if (t in 1.8..1.84) 9.0 else 0.0 }
+        assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun discardsCandidateIfGpsAccuracyDegradesBeforeClassification() {
+        drive(40.0, 3.0) { 0.0 }
+        drive(40.0, 1.0, accuracyM = 60.0) { t -> if (t in 0.8..0.84) 9.0 else 0.0 }
+        drive(40.0, 0.1, gpsAvailable = false) { 0.0 }
+        val recoveredPosition = Geo.destination(start, 0.0, travelledM)
+        analyzer.onLocation(tNs, recoveredPosition.lat, recoveredPosition.lon, 40 / 3.6, 0.0, 5.0)
+        drive(40.0, 1.0) { 0.0 }
+        assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun eventPositionStaysAtJoltWhenNextFixArrivesBeforeClassification() {
         drive(40.0, 3.0, signal = noise(0.3))
         drive(40.0, 3.0) { t -> if (t in 1.5..1.54) 9.0 else 0.0 }
         val event = events.single()
         val expectedM = 40 / 3.6 * 4.5
         val actualM = Geo.distanceM(start, event.position)
-        assertEquals(expectedM, actualM, 15.0)
+        assertEquals(expectedM, actualM, 0.1)
     }
 
     @Test
