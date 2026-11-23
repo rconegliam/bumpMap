@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.sin
 
 class RoadAnalyzerTest {
@@ -21,6 +22,7 @@ class RoadAnalyzerTest {
         seconds: Double,
         accuracyM: Double = 5.0,
         gpsAvailable: Boolean = true,
+        gpsOffsetM: Double = 0.0,
         signal: (Double) -> Double,
     ) {
         val speed = speedKmh / 3.6
@@ -31,7 +33,8 @@ class RoadAnalyzerTest {
             travelledM += speed * 0.01
             analyzer.onVertical(tNs, signal((tNs - startNs) / 1e9))
             if (gpsAvailable && (i + 1) % 100 == 0) {
-                val p = Geo.destination(start, 0.0, travelledM)
+                val idealPosition = Geo.destination(start, 0.0, travelledM)
+                val p = if (gpsOffsetM == 0.0) idealPosition else Geo.destination(idealPosition, 90.0, gpsOffsetM)
                 analyzer.onLocation(tNs, p.lat, p.lon, speed, 0.0, accuracyM)
             }
         }
@@ -72,9 +75,10 @@ class RoadAnalyzerTest {
     }
 
     @Test
-    fun trafficStopDoesNotChangeSegmentRmsOrSpeed() {
+    fun trafficStopWithGpsDriftDoesNotChangeRatedSegment() {
         drive(36.0, 2.0) { 0.4 }
-        drive(0.0, 8.0) { 1.5 }
+        drive(0.0, 4.0, gpsOffsetM = 1.0) { 1.5 }
+        drive(0.0, 4.0, gpsOffsetM = 3.0) { 1.5 }
         assertTrue(segments.isEmpty())
 
         drive(36.0, 2.0) { 0.4 }
@@ -83,6 +87,8 @@ class RoadAnalyzerTest {
         assertEquals(0.4, segment.rms, 0.001)
         assertEquals(10.0, segment.speedMps, 0.001)
         assertEquals(30.0, segment.lengthM, 0.001)
+        assertEquals(Geo.destination(start, 0.0, 10.0).lat, segment.points.first().lat, 1e-9)
+        assertTrue(segment.points.all { abs(it.lon - start.lon) < 1e-9 })
     }
 
     @Test

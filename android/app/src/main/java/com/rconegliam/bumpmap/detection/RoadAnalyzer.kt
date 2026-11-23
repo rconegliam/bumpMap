@@ -67,10 +67,9 @@ class RoadAnalyzer(
         val fixGapNs = tNs - lastFixNs
         val previous = lastFix?.takeIf { fixGapNs in 1..config.maxFixGapNs }
         if (previous == null || fixGapNs > config.maxExtrapolationNs) eventCandidate = null
-        val distance = if (previous != null) Geo.distanceM(previous, point) else 0.0
         val speed = when {
             !speedMps.isNaN() -> speedMps
-            previous != null -> distance / (fixGapNs / 1e9)
+            previous != null -> Geo.distanceM(previous, point) / (fixGapNs / 1e9)
             else -> Double.NaN
         }
         this.speedMps = speed
@@ -82,13 +81,17 @@ class RoadAnalyzer(
             resetSegment()
             return
         }
+        val segmentStart = segmentPoints.lastOrNull() ?: previous
+        val distance = Geo.distanceM(segmentStart, point)
+        // At a reported stop, keep the last rated point as the anchor through GPS drift.
+        if (speedMps == 0.0 && distance <= accuracyM) return
         if (distance == 0.0) return
         if (!speed.isFinite() || speed < config.minSegmentSpeedMps) {
-            // End at the last rated fix so the map cannot draw a line across unrated movement.
+            // Restart rather than drawing a line across unrated movement.
             resetSegment()
             return
         }
-        if (segmentPoints.isEmpty()) segmentPoints.add(previous)
+        if (segmentPoints.isEmpty()) segmentPoints.add(segmentStart)
         segmentPoints.add(point)
         segmentLengthM += distance
         segmentSumSquares += sumSquares
