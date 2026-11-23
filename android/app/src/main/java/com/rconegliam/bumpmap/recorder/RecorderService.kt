@@ -31,12 +31,19 @@ import androidx.core.content.ContextCompat
 import com.rconegliam.bumpmap.BuildConfig
 import com.rconegliam.bumpmap.MainActivity
 import com.rconegliam.bumpmap.R
+import com.rconegliam.bumpmap.detection.DetectionStore
+import com.rconegliam.bumpmap.detection.EventType
+import com.rconegliam.bumpmap.detection.GeoJson
+import com.rconegliam.bumpmap.detection.RoadAnalyzer
+import com.rconegliam.bumpmap.detection.RoadEvent
+import com.rconegliam.bumpmap.detection.RoadSegment
 import java.io.BufferedWriter
 import java.io.File
 
 /**
  * Foreground service that writes accelerometer, gyroscope, gravity and GPS readings to a CSV file
- * while the user drives. All sensor/location callbacks and file writes run on one worker thread.
+ * while the user drives, and runs [RoadAnalyzer] on the fly to rate the road and detect potholes and
+ * speed bumps. All sensor/location callbacks and file writes run on one worker thread.
  */
 class RecorderService : Service(), SensorEventListener, LocationListener {
 
@@ -82,6 +89,11 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
 
     // Accessed only on the worker thread.
     private var writer: BufferedWriter? = null
+    private var detectionWriter: BufferedWriter? = null
+    private var analyzer: RoadAnalyzer? = null
+    private var potholes = 0
+    private var speedBumps = 0
+    private var lastSegment: RoadSegment? = null
     private val gravity = FloatArray(3)
     private var hasGravity = false
     private var hasGravitySensor = false
@@ -160,6 +172,8 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
             writer = file.bufferedWriter().apply {
                 writeHeader(this, startedAtMs, startedAtElapsedNs, accelerometer, gyroscope, gravitySensor)
             }
+            detectionWriter = DetectionStore.fileFor(this@RecorderService, file.name).bufferedWriter()
+            analyzer = RoadAnalyzer(onSegment = ::onSegment, onEvent = ::onEvent)
         }
         listOfNotNull(accelerometer, gyroscope, gravitySensor).forEach { sensor ->
             sensorManager.registerListener(this, sensor, SENSOR_PERIOD_US, worker)
@@ -232,10 +246,9 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
                     hasGravity = true
                 }
                 if (hasGravity) {
-                    shake.add(
-                        event.timestamp,
-                        SignalMath.verticalLinear(v[0], v[1], v[2], gravity[0], gravity[1], gravity[2]),
-                    )
+                    val vertical = SignalMath.verticalLinear(v[0], v[1], v[2], gravity[0], gravity[1], gravity[2])
+                    shake.add(event.timestamp, vertical)
+                    analyzer?.onVertical(event.timestamp, vertical)
                 }
             }
             Sensor.TYPE_GYROSCOPE -> {
@@ -267,8 +280,38 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
             ),
         )
         locationFixes++
+        analyzer?.onLocation(
+            tNs = location.elapsedRealtimeNanos,
+            lat = location.latitude,
+            lon = location.longitude,
+            speedMps = if (location.hasSpeed()) location.speed.toDouble() else Double.NaN,
+            bearingDeg = if (location.hasBearing()) location.bearing.toDouble() else Double.NaN,
+            accuracyM = if (location.hasAccuracy()) location.accuracy.toDouble() else Double.NaN,
+        )
         speedKmh = if (location.hasSpeed()) location.speed * 3.6f else null
         accuracyM = if (location.hasAccuracy()) location.accuracy else null
+    }
+
+    private fun onSegment(segment: RoadSegment) {
+        lastSegment = segment
+        writeDetection(GeoJson.feature(segment))
+    }
+
+    private fun onEvent(event: RoadEvent) {
+        writer?.appendLine(CsvRows.event(event))
+        when (event.type) {
+            EventType.POTHOLE -> potholes++
+            EventType.SPEED_BUMP -> speedBumps++
+        }
+        writeDetection(GeoJson.feature(event))
+        publishStatus()
+    }
+
+    private fun writeDetection(feature: String) {
+        val out = detectionWriter ?: return
+        out.appendLine(feature)
+        out.flush()
+        DetectionStore.notifyChanged()
     }
 
     // Overridden explicitly: these have no default implementation before Android 11.
@@ -287,6 +330,9 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
         speedKmh = null
         accuracyM = null
         marks = 0
+        potholes = 0
+        speedBumps = 0
+        lastSegment = null
     }
 
     private fun publishStatus() {
@@ -299,6 +345,10 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
                 accuracyM = accuracyM,
                 shakeRms = shake.value,
                 marks = marks,
+                potholes = potholes,
+                speedBumps = speedBumps,
+                roadScore = lastSegment?.score,
+                roadQuality = lastSegment?.quality,
             )
         }
     }
@@ -306,6 +356,9 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
     private fun closeWriter() {
         runCatching { writer?.close() }
         writer = null
+        runCatching { detectionWriter?.close() }
+        detectionWriter = null
+        analyzer = null
     }
 
     private fun writeHeader(
@@ -316,7 +369,7 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
         gyroscope: Sensor?,
         gravitySensor: Sensor?,
     ) {
-        out.appendLine(CsvRows.meta("format", 1))
+        out.appendLine(CsvRows.meta("format", 2))
         out.appendLine(CsvRows.meta("app_version", BuildConfig.VERSION_NAME))
         out.appendLine(CsvRows.meta("device", "${Build.MANUFACTURER} ${Build.MODEL}"))
         out.appendLine(CsvRows.meta("android_sdk", Build.VERSION.SDK_INT))
