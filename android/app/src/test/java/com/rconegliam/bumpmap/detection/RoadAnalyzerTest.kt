@@ -23,6 +23,7 @@ class RoadAnalyzerTest {
         accuracyM: Double = 5.0,
         gpsAvailable: Boolean = true,
         gpsOffsetM: Double = 0.0,
+        reportedSpeedKmh: Double = speedKmh,
         signal: (Double) -> Double,
     ) {
         val speed = speedKmh / 3.6
@@ -35,7 +36,7 @@ class RoadAnalyzerTest {
             if (gpsAvailable && (i + 1) % 100 == 0) {
                 val idealPosition = Geo.destination(start, 0.0, travelledM)
                 val p = if (gpsOffsetM == 0.0) idealPosition else Geo.destination(idealPosition, 90.0, gpsOffsetM)
-                analyzer.onLocation(tNs, p.lat, p.lon, speed, 0.0, accuracyM)
+                analyzer.onLocation(tNs, p.lat, p.lon, reportedSpeedKmh / 3.6, 0.0, accuracyM)
             }
         }
     }
@@ -77,6 +78,7 @@ class RoadAnalyzerTest {
     @Test
     fun trafficStopWithGpsDriftDoesNotChangeRatedSegment() {
         drive(36.0, 2.0) { 0.4 }
+        drive(0.0, 1.0) { 1.5 }
         drive(0.0, 4.0, gpsOffsetM = 1.0) { 1.5 }
         drive(0.0, 4.0, gpsOffsetM = 3.0) { 1.5 }
         assertTrue(segments.isEmpty())
@@ -89,6 +91,20 @@ class RoadAnalyzerTest {
         assertEquals(30.0, segment.lengthM, 0.001)
         assertEquals(Geo.destination(start, 0.0, 10.0).lat, segment.points.first().lat, 1e-9)
         assertTrue(segment.points.all { abs(it.lon - start.lon) < 1e-9 })
+    }
+
+    @Test
+    fun movementBeforeFirstZeroSpeedFixIsNotRated() {
+        drive(36.0, 2.0) { 0.4 }
+        drive(18.0, 1.0, accuracyM = 8.0, reportedSpeedKmh = 0.0) { 1.5 }
+        val stopPosition = Geo.destination(start, 0.0, travelledM)
+        drive(0.0, 2.0, gpsOffsetM = 2.0) { 1.5 }
+        drive(36.0, 3.0) { 0.4 }
+
+        val segment = segments.single()
+        assertEquals(stopPosition, segment.points.first())
+        assertEquals(30.0, segment.lengthM, 0.001)
+        assertEquals(0.4, segment.rms, 0.001)
     }
 
     @Test

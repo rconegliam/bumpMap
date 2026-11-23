@@ -20,6 +20,7 @@ class RoadAnalyzer(
     private var lastFixNs = 0L
     private var speedMps = Double.NaN
     private var bearingDeg = Double.NaN
+    private var stoppedAt: GeoPoint? = null
 
     private val segmentPoints = ArrayList<GeoPoint>()
     private var segmentLengthM = 0.0
@@ -60,6 +61,7 @@ class RoadAnalyzer(
         if (accuracyM.isNaN() || accuracyM > config.maxAccuracyM) {
             lastFix = null
             this.speedMps = Double.NaN
+            stoppedAt = null
             eventCandidate = null
             resetSegment()
             return
@@ -79,12 +81,20 @@ class RoadAnalyzer(
 
         if (previous == null) {
             resetSegment()
+            stoppedAt = point.takeIf { speedMps == 0.0 }
             return
         }
-        val segmentStart = segmentPoints.lastOrNull() ?: previous
+        val stop = stoppedAt
+        if (speedMps == 0.0) {
+            if (stop != null && Geo.distanceM(stop, point) <= accuracyM) return
+            // A changed position on the first zero-speed fix can be braking distance.
+            if (stop != null || point != previous) resetSegment()
+            stoppedAt = point
+            return
+        }
+        stoppedAt = null
+        val segmentStart = segmentPoints.lastOrNull() ?: stop ?: previous
         val distance = Geo.distanceM(segmentStart, point)
-        // At a reported stop, keep the last rated point as the anchor through GPS drift.
-        if (speedMps == 0.0 && distance <= accuracyM) return
         if (distance == 0.0) return
         if (!speed.isFinite() || speed < config.minSegmentSpeedMps) {
             // Restart rather than drawing a line across unrated movement.
