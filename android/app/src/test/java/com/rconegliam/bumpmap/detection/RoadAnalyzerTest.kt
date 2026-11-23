@@ -86,6 +86,20 @@ class RoadAnalyzerTest {
     }
 
     @Test
+    fun segmentGeometryStartsAfterUnratedMovement() {
+        drive(36.0, 2.0) { 0.4 }
+        drive(8.0, 4.0) { 1.5 }
+        val startOfRatedMovement = Geo.destination(start, 0.0, travelledM)
+        drive(36.0, 3.0) { 0.4 }
+
+        val segment = segments.single()
+        assertEquals(startOfRatedMovement, segment.points.first())
+        assertEquals(4, segment.points.size)
+        assertEquals(30.0, segment.lengthM, 0.001)
+        assertEquals(0.4, segment.rms, 0.001)
+    }
+
+    @Test
     fun sameShakeAtHigherSpeedRatesSmoother() {
         val slow = analyzer.roughness(rms = 1.0, speedMps = 20 / 3.6)
         val fast = analyzer.roughness(rms = 1.0, speedMps = 80 / 3.6)

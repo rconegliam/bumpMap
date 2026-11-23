@@ -82,8 +82,12 @@ class RoadAnalyzer(
             resetSegment()
             return
         }
-        // Keep idle vibration and GPS drift during stops out of the moving segment.
-        if (!speed.isFinite() || speed < config.minSegmentSpeedMps || distance == 0.0) return
+        if (distance == 0.0) return
+        if (!speed.isFinite() || speed < config.minSegmentSpeedMps) {
+            // End at the last rated fix so the map cannot draw a line across unrated movement.
+            resetSegment()
+            return
+        }
         if (segmentPoints.isEmpty()) segmentPoints.add(previous)
         segmentPoints.add(point)
         segmentLengthM += distance
