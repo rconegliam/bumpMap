@@ -28,9 +28,9 @@ type,t_ns,v1,v2,v3,v4,v5,v6
 
 While recording, `RoadAnalyzer` rates the road and detects events on the phone. Results go to `files/detections/<recording name>.ndjson`, one GeoJSON feature per line:
 
-- `LineString` with `kind=segment`: about 25 m of road, with `quality` (`good`, `fair`, `poor`, `bad`), `score` (0-100), `roughness` and `speed_kmh`. Roughness is the vertical acceleration RMS scaled to 40 km/h: `rms * sqrt(40 km/h / speed)`. Segments driven below 12 km/h or with GPS accuracy worse than 25 m are skipped.
+- `LineString` with `kind=segment`: about 25 m of road, with `quality` (`good`, `fair`, `poor`, `bad`), `score` (0-100), `roughness` and `speed_kmh`. Roughness is the vertical acceleration RMS scaled to 40 km/h: `rms * sqrt(40 km/h / speed)`. GPS intervals below 12 km/h do not contribute distance, speed or vibration to the rating. A fix with accuracy worse than 25 m interrupts the segment.
 - `Point` with `kind=event`: `type` (`pothole`, `speed_bump`), `peak` and `speed_kmh`. A speed bump is a slow heave: the 2 Hz low-passed vertical acceleration stays above 1.2 m/s² for at least 150 ms. A pothole is a sharp jolt: the high-passed signal goes above 4.5 m/s².
 
-Automatic events require a GPS fix no older than 2 seconds with accuracy within 25 m. The marker uses the position estimated at the start of the jolt. If GPS becomes stale or inaccurate before the event is classified, the detector discards the event.
+Automatic events require a GPS fix no older than 2 seconds with accuracy within 25 m. The detector checks the minimum speed of 7 km/h at the start of the jolt. The marker uses the position estimated at that moment. If GPS becomes stale or inaccurate before classification, the detector discards the event.
 
 All thresholds live in `DetectionConfig` and are first estimates, to be calibrated with real drives against the manual marks.

@@ -72,6 +72,20 @@ class RoadAnalyzerTest {
     }
 
     @Test
+    fun trafficStopDoesNotChangeSegmentRmsOrSpeed() {
+        drive(36.0, 2.0) { 0.4 }
+        drive(0.0, 8.0) { 1.5 }
+        assertTrue(segments.isEmpty())
+
+        drive(36.0, 2.0) { 0.4 }
+        val segment = segments.single()
+        assertEquals(RoadQuality.GOOD, segment.quality)
+        assertEquals(0.4, segment.rms, 0.001)
+        assertEquals(10.0, segment.speedMps, 0.001)
+        assertEquals(30.0, segment.lengthM, 0.001)
+    }
+
+    @Test
     fun sameShakeAtHigherSpeedRatesSmoother() {
         val slow = analyzer.roughness(rms = 1.0, speedMps = 20 / 3.6)
         val fast = analyzer.roughness(rms = 1.0, speedMps = 80 / 3.6)
@@ -96,6 +110,19 @@ class RoadAnalyzerTest {
     }
 
     @Test
+    fun separatedSharpJoltsDoNotCountAsSustainedHeave() {
+        drive(25.0, 3.0) { 0.0 }
+        drive(25.0, 3.0) { t ->
+            when (t) {
+                in 1.1..1.14 -> 9.0
+                in 1.46..1.50 -> -9.0
+                else -> 0.0
+            }
+        }
+        assertEquals(EventType.POTHOLE, events.single().type)
+    }
+
+    @Test
     fun frontAndRearWheelsCountAsOneBump() {
         val heave = { t: Double -> if (t in 1.0..1.5) 3.0 * sin(2 * PI * (t - 1.0)) else 0.0 }
         drive(15.0, 3.0, signal = noise(0.3))
@@ -107,6 +134,15 @@ class RoadAnalyzerTest {
     fun noEventsWhenStopped() {
         drive(0.0, 3.0) { t -> if (t in 1.0..1.04) 9.0 else 0.0 }
         assertTrue(events.isEmpty())
+    }
+
+    @Test
+    fun brakingAfterJoltKeepsPotholeAtItsOnsetSpeed() {
+        drive(10.0, 3.0) { 0.0 }
+        drive(5.0, 2.0) { t -> if (t in 0.8..0.84) 9.0 else 0.0 }
+        val event = events.single()
+        assertEquals(EventType.POTHOLE, event.type)
+        assertEquals(10 / 3.6, event.speedMps, 0.001)
     }
 
     @Test

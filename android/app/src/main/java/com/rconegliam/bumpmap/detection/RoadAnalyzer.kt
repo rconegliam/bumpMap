@@ -27,6 +27,8 @@ class RoadAnalyzer(
     private var segmentSamples = 0
     private var segmentSpeedSum = 0.0
     private var segmentSpeedCount = 0
+    private var intervalSumSquares = 0.0
+    private var intervalSamples = 0
 
     private val lowPassRc = 1.0 / (2 * PI * config.lowPassHz)
     private var lowPass = 0.0
@@ -43,29 +45,32 @@ class RoadAnalyzer(
         lowPass += alpha * (verticalAcc - lowPass)
         val highPass = verticalAcc - lowPass
 
-        segmentSumSquares += verticalAcc * verticalAcc
-        segmentSamples++
+        intervalSumSquares += verticalAcc * verticalAcc
+        intervalSamples++
         detectEvent(tNs, dtNs, highPass)
     }
 
     /** Pass NaN for values the fix does not have. */
     fun onLocation(tNs: Long, lat: Double, lon: Double, speedMps: Double, bearingDeg: Double, accuracyM: Double) {
+        val sumSquares = intervalSumSquares
+        val samples = intervalSamples
+        intervalSumSquares = 0.0
+        intervalSamples = 0
         val point = GeoPoint(lat, lon)
         if (accuracyM.isNaN() || accuracyM > config.maxAccuracyM) {
             lastFix = null
             this.speedMps = Double.NaN
             eventCandidate = null
-            resetSegment(null)
+            resetSegment()
             return
         }
-        val previous = lastFix
         val fixGapNs = tNs - lastFixNs
-        val connected = previous != null && fixGapNs in 1..config.maxFixGapNs
-        if (!connected || fixGapNs > config.maxExtrapolationNs) eventCandidate = null
-        val distance = if (connected) Geo.distanceM(previous!!, point) else 0.0
+        val previous = lastFix?.takeIf { fixGapNs in 1..config.maxFixGapNs }
+        if (previous == null || fixGapNs > config.maxExtrapolationNs) eventCandidate = null
+        val distance = if (previous != null) Geo.distanceM(previous, point) else 0.0
         val speed = when {
             !speedMps.isNaN() -> speedMps
-            connected -> distance / (fixGapNs / 1e9)
+            previous != null -> distance / (fixGapNs / 1e9)
             else -> Double.NaN
         }
         this.speedMps = speed
@@ -73,26 +78,28 @@ class RoadAnalyzer(
         lastFix = point
         lastFixNs = tNs
 
-        if (!connected) {
-            resetSegment(point)
+        if (previous == null) {
+            resetSegment()
             return
         }
+        // Keep idle vibration and GPS drift during stops out of the moving segment.
+        if (!speed.isFinite() || speed < config.minSegmentSpeedMps || distance == 0.0) return
+        if (segmentPoints.isEmpty()) segmentPoints.add(previous)
         segmentPoints.add(point)
         segmentLengthM += distance
-        if (!speed.isNaN()) {
-            segmentSpeedSum += speed
-            segmentSpeedCount++
-        }
+        segmentSumSquares += sumSquares
+        segmentSamples += samples
+        segmentSpeedSum += speed
+        segmentSpeedCount++
         if (segmentLengthM >= config.segmentLengthM) {
             closeSegment()
-            resetSegment(point)
+            resetSegment()
         }
     }
 
     private fun closeSegment() {
         if (segmentSpeedCount == 0 || segmentSamples < config.minSegmentSamples) return
         val meanSpeed = segmentSpeedSum / segmentSpeedCount
-        if (meanSpeed < config.minSegmentSpeedMps) return
         val rms = sqrt(segmentSumSquares / segmentSamples)
         val roughness = roughness(rms, meanSpeed)
         onSegment(
@@ -108,9 +115,8 @@ class RoadAnalyzer(
         )
     }
 
-    private fun resetSegment(start: GeoPoint?) {
+    private fun resetSegment() {
         segmentPoints.clear()
-        start?.let { segmentPoints.add(it) }
         segmentLengthM = 0.0
         segmentSumSquares = 0.0
         segmentSamples = 0
@@ -141,13 +147,12 @@ class RoadAnalyzer(
     private fun detectEvent(tNs: Long, dtNs: Long, highPass: Double) {
         val fix = lastFix
         val fixAgeNs = tNs - lastFixNs
-        if (fix == null || fixAgeNs !in 0..config.maxExtrapolationNs ||
-            !speedMps.isFinite() || speedMps < config.minEventSpeedMps
-        ) {
+        if (fix == null || fixAgeNs !in 0..config.maxExtrapolationNs) {
             eventCandidate = null
             return
         }
         val candidate = eventCandidate ?: run {
+            if (!speedMps.isFinite() || speedMps < config.minEventSpeedMps) return
             if (tNs < refractoryUntilNs) return
             if (abs(highPass) < config.potholeHighPass && abs(lowPass) < config.bumpLowPass) return
             // Anchor the event when the jolt starts, before a newer fix can move its position.
@@ -157,11 +162,17 @@ class RoadAnalyzer(
         }
         candidate.maxHighPass = max(candidate.maxHighPass, abs(highPass))
         candidate.maxLowPass = max(candidate.maxLowPass, abs(lowPass))
-        if (abs(lowPass) >= config.bumpLowPass) candidate.lowPassAboveNs += dtNs
+        if (abs(lowPass) >= config.bumpLowPass) {
+            val aboveSinceNs = candidate.lowPassAboveSinceNs?.takeIf { dtNs < MAX_SAMPLE_GAP_NS } ?: tNs
+            candidate.lowPassAboveSinceNs = aboveSinceNs
+            candidate.longestLowPassAboveNs = max(candidate.longestLowPassAboveNs, tNs - aboveSinceNs)
+        } else {
+            candidate.lowPassAboveSinceNs = null
+        }
         if (tNs - candidate.startNs < config.eventWindowNs) return
 
         val type = when {
-            candidate.lowPassAboveNs >= config.bumpMinDurationNs && candidate.speedMps <= config.maxBumpSpeedMps ->
+            candidate.longestLowPassAboveNs >= config.bumpMinDurationNs && candidate.speedMps <= config.maxBumpSpeedMps ->
                 EventType.SPEED_BUMP
             candidate.maxHighPass >= config.potholeHighPass -> EventType.POTHOLE
             else -> null
@@ -176,7 +187,8 @@ class RoadAnalyzer(
     private class EventCandidate(val startNs: Long, val position: GeoPoint, val speedMps: Double) {
         var maxHighPass = 0.0
         var maxLowPass = 0.0
-        var lowPassAboveNs = 0L
+        var lowPassAboveSinceNs: Long? = null
+        var longestLowPassAboveNs = 0L
     }
 
     private companion object {
