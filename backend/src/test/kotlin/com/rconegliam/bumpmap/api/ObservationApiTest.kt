@@ -33,9 +33,12 @@ class ObservationApiTest {
                 val submission = client.post("/v1/observations") {
                     bearerAuth(token)
                     contentType(geoJson)
+                    accept(geoJson)
                     setBody("""{"type":"FeatureCollection","features":[${pointFeature(id)}]}""")
                 }
                 assertEquals(HttpStatusCode.OK, submission.status)
+                assertEquals(ContentType.Application.Json, submission.contentType()?.withoutParameters())
+                assertEquals("""{"accepted":1}""", submission.bodyAsText())
 
                 val response = client.get("/v1/observations?bbox=-46.88,-23.52,-46.87,-23.50") {
                     bearerAuth(token)
@@ -44,6 +47,14 @@ class ObservationApiTest {
                 assertEquals(HttpStatusCode.OK, response.status)
                 assertEquals(geoJson, response.contentType()?.withoutParameters())
                 assertTrue(Json.decodeFromString<ObservationPage>(response.bodyAsText()).features.any { it.id == id })
+
+                val invalidBox = client.get("/v1/observations?bbox=1,2,3,4") {
+                    bearerAuth(token)
+                    accept(geoJson)
+                }
+                assertEquals(HttpStatusCode.BadRequest, invalidBox.status)
+                assertEquals(ContentType.Application.Json, invalidBox.contentType()?.withoutParameters())
+                assertEquals("""{"error":"invalid_bbox_or_cursor"}""", invalidBox.bodyAsText())
             }
         }
     }

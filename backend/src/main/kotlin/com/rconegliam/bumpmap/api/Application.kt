@@ -3,6 +3,9 @@ package com.rconegliam.bumpmap.api
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.content.OutgoingContent
+import io.ktor.serialization.ContentConverter
+import io.ktor.serialization.kotlinx.KotlinxSerializationConverter
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -26,6 +29,8 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
+import io.ktor.util.reflect.TypeInfo
+import java.nio.charset.Charset
 import java.security.MessageDigest
 import java.sql.SQLException
 import kotlinx.coroutines.Dispatchers
@@ -53,7 +58,7 @@ internal fun Application.bumpMapApi(store: ObservationStore, token: String) {
     val logger = environment.log
     install(ContentNegotiation) {
         json(Json)
-        json(Json, GEO_JSON)
+        register(GEO_JSON, GeoJsonConverter(KotlinxSerializationConverter(Json)))
     }
     install(Authentication) {
         bearer {
@@ -125,6 +130,18 @@ internal fun Application.bumpMapApi(store: ObservationStore, token: String) {
                 }
             }
         }
+    }
+}
+
+private class GeoJsonConverter(private val json: ContentConverter) : ContentConverter by json {
+    override suspend fun serialize(
+        contentType: ContentType,
+        charset: Charset,
+        typeInfo: TypeInfo,
+        value: Any?,
+    ): OutgoingContent? {
+        val responseType = if (value is ObservationPage) contentType else ContentType.Application.Json
+        return json.serialize(responseType, charset, typeInfo, value)
     }
 }
 

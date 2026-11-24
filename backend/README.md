@@ -14,6 +14,7 @@ described in the [plan](../docs/PLAN.md).
 Both observation routes require `Authorization: Bearer <BUMPMAP_API_TOKEN>`.
 Use `Content-Type: application/json` or `application/geo+json` to submit observations.
 Send `Accept: application/geo+json` to request that media type when reading them.
+Upload acknowledgments and errors are returned as `application/json`.
 Pass the returned `next_cursor` as `after` with the same bounding box to read
 the next page. Bounding boxes use longitude and latitude in degrees and can
 span up to one degree on each axis.
