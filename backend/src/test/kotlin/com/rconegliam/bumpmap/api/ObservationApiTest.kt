@@ -15,6 +15,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 class ObservationApiTest {
     @Test
@@ -61,6 +64,14 @@ class ObservationApiTest {
                 assertTrue(result.features.any { it.id == lineId && it.geometry.type == "LineString" })
                 assertTrue(result.features.any { it.id == pointId && it.properties.eventType == "pothole" })
                 assertFalse(result.features.any { it.id == rolledBackId })
+                val returnedFeatures = Json.parseToJsonElement(
+                    client.get(bbox) { bearerAuth(token) }.bodyAsText(),
+                ).jsonObject.getValue("features").jsonArray
+                val returnedPoint = returnedFeatures.single { it.jsonObject["id"]?.jsonPrimitive?.content == pointId }
+                assertEquals(
+                    Json.parseToJsonElement(point).jsonObject["properties"],
+                    returnedPoint.jsonObject["properties"],
+                )
                 val otherArea = read("/v1/observations?bbox=-46.76,-23.60,-46.75,-23.59")
                 assertFalse(otherArea.features.any { it.id in setOf(lineId, pointId) })
             }

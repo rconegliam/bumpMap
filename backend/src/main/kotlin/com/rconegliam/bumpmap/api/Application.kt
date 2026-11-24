@@ -31,6 +31,7 @@ import java.sql.SQLException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 
 private const val MAX_BODY_BYTES = 256L * 1024
 
@@ -49,7 +50,7 @@ fun main() {
 internal fun Application.bumpMapApi(store: ObservationStore, token: String) {
     val tokenBytes = token.toByteArray()
     val logger = environment.log
-    install(ContentNegotiation) { json() }
+    install(ContentNegotiation) { json(Json) }
     install(Authentication) {
         bearer {
             authenticate { credential ->
