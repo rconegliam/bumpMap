@@ -84,7 +84,9 @@ internal fun mapFeatures(lines: Sequence<String>, recordingId: UUID): List<Featu
         )
         var best: Segment? = null
         var bestDistance = MAX_EVENT_DISTANCE_METERS
+        val eventTimeNs = feature.getNumberProperty("t_ns")?.toLong()
         for (candidate in nearby) {
+            if (!candidate.covers(eventTimeNs)) continue
             val distance = candidate.distanceTo(point)
             if (distance < bestDistance ||
                 (distance == bestDistance && best != null && abs(candidate.index - index) < abs(best.index - index))
@@ -101,12 +103,24 @@ internal fun mapFeatures(lines: Sequence<String>, recordingId: UUID): List<Featu
         segment.feature.addNumberProperty(POTHOLE_COUNT, segment.potholes)
         segment.feature.addNumberProperty(SPEED_BUMP_COUNT, segment.speedBumps)
     }
-    return features.map { it.value }
+    return features.map { (_, feature) ->
+        // Elapsed time associates detections locally and is unnecessary in the shared map.
+        feature.removeProperty("t_ns")
+        feature.removeProperty("start_ns")
+        feature.removeProperty("end_ns")
+        feature
+    }
 }
 
 private class Segment(val index: Int, val feature: Feature, private val points: List<Point>) {
     var potholes = 0
     var speedBumps = 0
+
+    private val startNs = feature.getNumberProperty("start_ns")?.toLong()
+    private val endNs = feature.getNumberProperty("end_ns")?.toLong()
+
+    fun covers(eventTimeNs: Long?): Boolean =
+        eventTimeNs == null || startNs == null || endNs == null || eventTimeNs in startNs..endNs
 
     fun distanceTo(point: Point): Double {
         val longitudeScale = METERS_PER_DEGREE * cos(Math.toRadians(point.latitude()))

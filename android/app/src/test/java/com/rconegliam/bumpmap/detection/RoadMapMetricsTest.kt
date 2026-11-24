@@ -7,6 +7,22 @@ import org.junit.Test
 
 class RoadMapMetricsTest {
     @Test
+    fun aCloserReturnPassDoesNotInheritAnEarlierPothole() {
+        val start = GeoPoint(-23.53, -46.76)
+        val end = start.copy(lon = -46.7596)
+        val returnStart = start.copy(lat = -23.52994)
+        val returnEnd = end.copy(lat = returnStart.lat)
+        val lines = sequenceOf(
+            segment(start, end, 30.0, 100, 200),
+            event(returnStart.copy(lon = -46.7598), EventType.POTHOLE, 160),
+            segment(returnEnd, returnStart, 45.0, 300, 400),
+        )
+        val features = mapFeatures(lines, UUID.randomUUID())
+        assertEquals(listOf(1, 0), features.mapNotNull(RoadMapMetrics::from).map { it.potholes })
+        assertTrue(features.none { it.hasProperty("t_ns") || it.hasProperty("start_ns") || it.hasProperty("end_ns") })
+    }
+
+    @Test
     fun countsObstaclesOnlyOnTheirNearestMeasuredStretch() {
         val first = GeoPoint(-23.53, -46.76)
         val end = first.copy(lon = -46.7597)
@@ -45,9 +61,11 @@ class RoadMapMetricsTest {
         assertEquals(RoadQuality.BAD, holes.quality)
     }
 
-    private fun segment(start: GeoPoint, end: GeoPoint, speedKmh: Double) =
-        GeoJson.feature(RoadSegment(listOf(start, end), 30.0, speedKmh / 3.6, 0.0, 0.0, 100, RoadQuality.GOOD))
+    private fun segment(start: GeoPoint, end: GeoPoint, speedKmh: Double, startNs: Long? = null, endNs: Long? = null) =
+        GeoJson.feature(RoadSegment(
+            listOf(start, end), 30.0, speedKmh / 3.6, 0.0, 0.0, 100, RoadQuality.GOOD, startNs, endNs,
+        ))
 
-    private fun event(position: GeoPoint, type: EventType) =
-        GeoJson.feature(RoadEvent(type, 1L, position, 8.0, 5.0))
+    private fun event(position: GeoPoint, type: EventType, timeNs: Long = 1) =
+        GeoJson.feature(RoadEvent(type, timeNs, position, 8.0, 5.0))
 }

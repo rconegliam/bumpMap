@@ -23,6 +23,8 @@ class RoadAnalyzer(
     private var stoppedAt: GeoPoint? = null
 
     private val segmentPoints = ArrayList<GeoPoint>()
+    private var segmentStartNs = 0L
+    private var segmentEndNs = 0L
     private var segmentLengthM = 0.0
     private var segmentSumSquares = 0.0
     private var segmentSamples = 0
@@ -101,8 +103,12 @@ class RoadAnalyzer(
             endSegment()
             return
         }
-        if (segmentPoints.isEmpty()) segmentPoints.add(segmentStart)
+        if (segmentPoints.isEmpty()) {
+            segmentPoints.add(segmentStart)
+            segmentStartNs = tNs - fixGapNs
+        }
         segmentPoints.add(point)
+        segmentEndNs = tNs
         segmentLengthM += distance
         segmentSumSquares += sumSquares
         segmentSamples += samples
@@ -135,6 +141,8 @@ class RoadAnalyzer(
                 roughness = roughness,
                 score = score(roughness),
                 quality = quality(roughness),
+                startNs = segmentStartNs,
+                endNs = segmentEndNs,
             ),
         )
     }

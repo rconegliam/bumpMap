@@ -23,6 +23,8 @@ data class RoadSegment(
     val roughness: Double,
     val score: Int,
     val quality: RoadQuality,
+    val startNs: Long? = null,
+    val endNs: Long? = null,
 )
 
 data class RoadEvent(
