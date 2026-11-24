@@ -24,13 +24,14 @@ internal class RecordingUploadWorker(context: Context, parameters: WorkerParamet
         val token = RecordingSync.token(applicationContext) ?: return Result.success()
         val installationId = RecordingSync.installationId(applicationContext)
         var hasRejectedFile = false
+        var archiveFull = false
         for (file in RecordingStore.archiveFiles(applicationContext)) {
             if (isStopped) return Result.retry()
             try {
                 when (uploadFile(file, installationId, token)) {
                     HttpURLConnection.HTTP_NO_CONTENT -> Unit
                     HttpURLConnection.HTTP_UNAUTHORIZED, HttpURLConnection.HTTP_FORBIDDEN -> return Result.failure()
-                    HTTP_INSUFFICIENT_STORAGE -> return Result.failure(workDataOf(ARCHIVE_FULL to true))
+                    HTTP_INSUFFICIENT_STORAGE -> archiveFull = true
                     HttpURLConnection.HTTP_CLIENT_TIMEOUT, HttpURLConnection.HTTP_PRECON_FAILED,
                     429, in 500..599 -> return Result.retry()
                     else -> hasRejectedFile = true
@@ -39,7 +40,11 @@ internal class RecordingUploadWorker(context: Context, parameters: WorkerParamet
                 if (file.exists()) return Result.retry()
             }
         }
-        return if (hasRejectedFile) Result.failure() else Result.success()
+        return when {
+            archiveFull -> Result.failure(workDataOf(ARCHIVE_FULL to true))
+            hasRejectedFile -> Result.failure()
+            else -> Result.success()
+        }
     }
 
     private fun uploadFile(file: File, installationId: String, token: String): Int {
