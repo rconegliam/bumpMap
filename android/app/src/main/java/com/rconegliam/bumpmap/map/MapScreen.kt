@@ -1,6 +1,7 @@
 package com.rconegliam.bumpmap.map
 
 import android.graphics.Color
+import android.graphics.PointF
 import android.graphics.RectF
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -41,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rconegliam.bumpmap.R
 import com.rconegliam.bumpmap.detection.DetectionStore
 import com.rconegliam.bumpmap.detection.EventType
+import com.rconegliam.bumpmap.detection.Geo
 import com.rconegliam.bumpmap.detection.MEAN_SPEED
 import com.rconegliam.bumpmap.detection.POTHOLE_COUNT
 import com.rconegliam.bumpmap.detection.SPEED_BUMP_COUNT
@@ -68,6 +70,7 @@ import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
+import org.maplibre.geojson.LineString
 
 private const val STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
 private const val DETECTIONS_SOURCE = "bumpmap-detections"
@@ -134,9 +137,7 @@ fun MapScreen(modifier: Modifier = Modifier) {
         val idleListener = MapLibreMap.OnCameraIdleListener { viewport = currentMap.viewportBbox() }
         val clickListener = MapLibreMap.OnMapClickListener { position ->
             val pixel = currentMap.projection.toScreenLocation(position)
-            val area = RectF(pixel.x - tapRadius, pixel.y - tapRadius, pixel.x + tapRadius, pixel.y + tapRadius)
-            selection = currentMap.queryRenderedFeatures(area, SEGMENTS_LAYER)
-                .firstNotNullOfOrNull(RoadMapMetrics::from)
+            selection = currentMap.nearestRoad(pixel, tapRadius)
             selection != null
         }
         currentMap.addOnMapClickListener(clickListener)
@@ -196,6 +197,29 @@ fun MapScreen(modifier: Modifier = Modifier) {
             RoadDetails(metrics, Modifier.align(Alignment.BottomStart).padding(12.dp))
         }
     }
+}
+
+private fun MapLibreMap.nearestRoad(pixel: PointF, radius: Float): RoadMapMetrics? {
+    val area = RectF(pixel.x - radius, pixel.y - radius, pixel.x + radius, pixel.y + radius)
+    val candidates = queryRenderedFeatures(area, SEGMENTS_LAYER)
+    var nearest: RoadMapMetrics? = null
+    var bestDistance = radius.toDouble()
+    for (feature in candidates) {
+        val metrics = RoadMapMetrics.from(feature) ?: continue
+        val line = feature.geometry() as LineString
+        val points = line.coordinates().map { projection.toScreenLocation(LatLng(it.latitude(), it.longitude())) }
+        val distance = points.zipWithNext { a, b ->
+            Geo.distanceToSegment(
+                (a.x - pixel.x).toDouble(), (a.y - pixel.y).toDouble(),
+                (b.x - pixel.x).toDouble(), (b.y - pixel.y).toDouble(),
+            )
+        }.minOrNull() ?: continue
+        if (distance < bestDistance) {
+            bestDistance = distance
+            nearest = metrics
+        }
+    }
+    return nearest
 }
 
 private fun MapLibreMap.viewportBbox(): String? {

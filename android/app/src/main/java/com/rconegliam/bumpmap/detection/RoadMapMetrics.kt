@@ -3,7 +3,6 @@ package com.rconegliam.bumpmap.detection
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.cos
-import kotlin.math.hypot
 import kotlin.math.roundToInt
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.LineString
@@ -129,15 +128,7 @@ private class Segment(val index: Int, val feature: Feature, private val points: 
         fun y(position: Point): Double =
             (position.latitude() - point.latitude()) * METERS_PER_DEGREE
 
-        return points.zipWithNext { a, b ->
-            val ax = x(a)
-            val ay = y(a)
-            val dx = x(b) - ax
-            val dy = y(b) - ay
-            val lengthSquared = dx * dx + dy * dy
-            val fraction = if (lengthSquared == 0.0) 0.0
-                else (-(ax * dx + ay * dy) / lengthSquared).coerceIn(0.0, 1.0)
-            hypot(ax + fraction * dx, ay + fraction * dy)
-        }.minOrNull() ?: Double.POSITIVE_INFINITY
+        return points.zipWithNext { a, b -> Geo.distanceToSegment(x(a), y(a), x(b), y(b)) }
+            .minOrNull() ?: Double.POSITIVE_INFINITY
     }
 }

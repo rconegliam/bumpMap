@@ -3,11 +3,22 @@ package com.rconegliam.bumpmap.detection
 import kotlin.math.asin
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.sin
 import kotlin.math.sqrt
 
 object Geo {
     private const val EARTH_RADIUS_M = 6_371_000.0
+
+    /** Distance from the origin to a segment in local planar coordinates. */
+    internal fun distanceToSegment(ax: Double, ay: Double, bx: Double, by: Double): Double {
+        val dx = bx - ax
+        val dy = by - ay
+        val lengthSquared = dx * dx + dy * dy
+        val fraction = if (lengthSquared == 0.0) 0.0
+            else (-(ax * dx + ay * dy) / lengthSquared).coerceIn(0.0, 1.0)
+        return hypot(ax + fraction * dx, ay + fraction * dy)
+    }
 
     fun distanceM(a: GeoPoint, b: GeoPoint): Double {
         val lat1 = Math.toRadians(a.lat)
