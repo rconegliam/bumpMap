@@ -1,15 +1,14 @@
 # BumpMap API pilot
 
-This Ktor service stores and reads synthetic road observations in PostgreSQL with
-PostGIS. Keep the pilot token on trusted test clients. Real drives need the app
-consent and privacy controls, per-device credentials, and road aggregation
-described in the [plan](../docs/PLAN.md).
+This Ktor service stores road observations and opt-in Android recording archives
+in PostgreSQL with PostGIS. Keep the pilot token on trusted test clients.
 
 | Method | Path | Result |
 | --- | --- | --- |
 | GET | `/health` | 200 when the API can reach PostgreSQL, otherwise 503 |
 | POST | `/v1/observations` | Accepts a GeoJSON FeatureCollection with 1 to 100 observations and returns the accepted count |
 | GET | `/v1/observations?bbox=west,south,east,north` | Returns up to 500 intersecting features in a GeoJSON FeatureCollection |
+| PUT | `/v1/recordings/{id}/{kind}/{number}?parts=…&name=…` | Saves one part of an original recording file and returns 204 |
 
 Both observation routes require `Authorization: Bearer <BUMPMAP_API_TOKEN>`.
 Use `Content-Type: application/json` or `application/geo+json` to submit observations.
@@ -25,6 +24,27 @@ with changed content returns 409 and rolls back the entire submission. The
 allowed geometry and properties are the segment and automatic event fields
 from the [recording format](../docs/recording-format.md#detections), with 2D
 coordinates and no trip metadata.
+
+## Recording archives
+
+In the Android app, go to **Settings → Recording sync** and enter the value of
+`BUMPMAP_API_TOKEN` from the Railway API service. Activating sync queues finished
+recordings already on the phone and future recordings. WorkManager uploads on an
+unmetered network, resumes after interruption, and leaves the local files available
+for the map and export. This opt-in pilot archive includes the original GPS routes
+and sensor data.
+
+The archive endpoint requires the same bearer token and accepts
+`application/octet-stream`. The recording ID is a stable UUID shared by its
+`csv` and `ndjson` files. Each request includes an original file name, total
+part count, and zero-based part number. Parts are 512 KiB except for the last.
+An empty file is one empty part. A repeated identical part returns 204, while a
+changed part or file description returns 409.
+
+The `completed_recording_files` view lists files with every part in PostgreSQL.
+To reconstruct a file, read the matching `recording_file_parts.contents` bytes
+in `part_number` order and concatenate them. The archive has no HTTP download
+route. Its NDJSON files are separate from the shared road-observation endpoint.
 
 ## Local verification
 

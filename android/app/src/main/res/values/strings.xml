@@ -57,4 +57,15 @@
     <string name="settings_about">About</string>
     <string name="settings_version">Version %1$s</string>
     <string name="settings_map_data">Map data © OpenStreetMap contributors. Base map by OpenFreeMap.</string>
+    <string name="sync_title">Recording sync</string>
+    <string name="sync_description">Send saved and future recordings to the BumpMap pilot database on an unmetered network. Uploads include GPS routes, sensor readings, manual marks, and automatic detections. You can turn off future uploads here.</string>
+    <string name="sync_token">Pilot access token</string>
+    <string name="sync_enable">Enable sync</string>
+    <string name="sync_update_token">Update token</string>
+    <string name="sync_disable">Turn off sync</string>
+    <string name="sync_off">Sync is off</string>
+    <string name="sync_pending">Waiting to sync</string>
+    <string name="sync_running">Syncing recordings</string>
+    <string name="sync_failed">Sync failed. Check or update the pilot token.</string>
+    <string name="sync_up_to_date">Recordings are up to date</string>
 </resources>

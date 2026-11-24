@@ -36,3 +36,10 @@ An interruption can produce a shorter rated segment when the preceding stretch h
 Automatic events require a GPS fix no older than 2 seconds with accuracy within 25 m. The detector checks the minimum speed of 7 km/h at the start of the jolt. The marker uses the position estimated at that moment. If GPS becomes stale or inaccurate before classification, the detector discards the event.
 
 All thresholds live in `DetectionConfig` and are first estimates, to be calibrated with real drives against the manual marks.
+
+## Pilot sync
+
+The optional Recording sync setting sends the original CSV and NDJSON files to
+PostgreSQL after the recording closes. Sync uses an unmetered connection and
+resumes from the most recently acknowledged part. Recordings and detections
+already saved on the device are eligible when sync is enabled.

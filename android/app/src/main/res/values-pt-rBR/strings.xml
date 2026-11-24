@@ -58,4 +58,15 @@
     <string name="settings_about">Sobre</string>
     <string name="settings_version">Versão %1$s</string>
     <string name="settings_map_data">Dados do mapa © colaboradores do OpenStreetMap. Mapa base por OpenFreeMap.</string>
+    <string name="sync_title">Sincronização de gravações</string>
+    <string name="sync_description">Envia as gravações salvas e futuras ao banco do piloto BumpMap por uma rede sem cobrança por dados. O envio inclui trajetos do GPS, leituras dos sensores, marcações manuais e detecções automáticas. Você pode desativar os próximos envios aqui.</string>
+    <string name="sync_token">Token de acesso ao piloto</string>
+    <string name="sync_enable">Ativar sincronização</string>
+    <string name="sync_update_token">Atualizar token</string>
+    <string name="sync_disable">Desativar sincronização</string>
+    <string name="sync_off">Sincronização desativada</string>
+    <string name="sync_pending">Aguardando sincronização</string>
+    <string name="sync_running">Sincronizando gravações</string>
+    <string name="sync_failed">Falha na sincronização. Confira ou atualize o token do piloto.</string>
+    <string name="sync_up_to_date">Gravações sincronizadas</string>
 </resources>

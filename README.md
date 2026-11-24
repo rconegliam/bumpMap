@@ -22,8 +22,9 @@ cd android
 Current features:
 - Map (MapLibre + OpenFreeMap / OpenStreetMap) centered on Barueri and São Paulo, labels in the app language
 - Drive recorder: motion sensors + GPS saved to CSV, with buttons to mark speed bumps, potholes and rough pavement, and share the file. See [docs/recording-format.md](docs/recording-format.md)
+- Optional pilot sync for saved and future recordings, including the original CSV and NDJSON detections
 - English and Brazilian Portuguese, with an in-app language picker
 
 ## Backend pilot
 
-See [backend/README.md](backend/README.md) for the synthetic observation API and Railway deployment. The Android app records to local storage and does not connect to the API yet.
+See [backend/README.md](backend/README.md) for recording sync setup, the observation API, and Railway deployment.

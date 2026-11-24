@@ -27,6 +27,7 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
+import io.ktor.server.routing.put
 import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 import io.ktor.util.reflect.TypeInfo
@@ -48,12 +49,12 @@ fun main() {
     databasePool(env).use { pool ->
         migrate(pool)
         embeddedServer(Netty, host = "0.0.0.0", port = env["PORT"]?.toInt() ?: 8080) {
-            bumpMapApi(ObservationStore(pool), token)
+            bumpMapApi(ObservationStore(pool), RecordingStore(pool), token)
         }.start(wait = true)
     }
 }
 
-internal fun Application.bumpMapApi(store: ObservationStore, token: String) {
+internal fun Application.bumpMapApi(store: ObservationStore, recordings: RecordingStore, token: String) {
     val tokenBytes = token.toByteArray()
     val logger = environment.log
     install(ContentNegotiation) {
@@ -94,6 +95,39 @@ internal fun Application.bumpMapApi(store: ObservationStore, token: String) {
             }
         }
         authenticate {
+            route("/v1/recordings/{id}/{kind}/{number}") {
+                install(RequestBodyLimit) { bodyLimit { RECORDING_PART_BYTES.toLong() } }
+                put {
+                    call.response.header(HttpHeaders.CacheControl, "no-store")
+                    if (!call.request.contentType().match(ContentType.Application.OctetStream)) {
+                        call.respond(HttpStatusCode.UnsupportedMediaType, ApiError("expected_octet_stream"))
+                        return@put
+                    }
+                    val id = call.parameters["id"]?.let(::parseId)
+                    val number = call.parameters["number"]?.toIntOrNull()
+                    val partCount = call.request.queryParameters["parts"]?.toIntOrNull()
+                    if (id == null || number == null || partCount == null) {
+                        call.respond(HttpStatusCode.BadRequest, ApiError("invalid_recording_part"))
+                        return@put
+                    }
+                    val part = RecordingPart(
+                        id, call.parameters["kind"].orEmpty(), number, partCount,
+                        call.request.queryParameters["name"].orEmpty(),
+                    )
+                    if (!part.valid()) {
+                        call.respond(HttpStatusCode.BadRequest, ApiError("invalid_recording_part"))
+                        return@put
+                    }
+                    val bytes = call.receive<ByteArray>()
+                    if (!part.validSize(bytes.size)) {
+                        call.respond(HttpStatusCode.BadRequest, ApiError("invalid_recording_part_size"))
+                    } else if (withContext(Dispatchers.IO) { recordings.save(part, bytes) }) {
+                        call.respond(HttpStatusCode.NoContent)
+                    } else {
+                        call.respond(HttpStatusCode.Conflict, ApiError("recording_part_conflict"))
+                    }
+                }
+            }
             route("/v1/observations") {
                 install(RequestBodyLimit) { bodyLimit { MAX_BODY_BYTES } }
                 get {

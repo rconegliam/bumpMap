@@ -23,9 +23,13 @@ object DetectionStore {
 
     fun notifyChanged() = mutableVersion.update { it + 1 }
 
-    fun loadFeatures(context: Context): List<String> =
+    fun list(context: Context): List<File> =
         dir(context).listFiles { file -> file.extension == "ndjson" }
+            ?.toList()
             .orEmpty()
+
+    fun loadFeatures(context: Context): List<String> =
+        list(context)
             .sortedBy { it.name }
             .flatMap { file -> file.readLines().filter { it.startsWith("{") && it.endsWith("}") } }
 

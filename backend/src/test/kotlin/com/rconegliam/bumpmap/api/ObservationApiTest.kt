@@ -29,7 +29,7 @@ class ObservationApiTest {
         databasePool(System.getenv()).use { pool ->
             migrate(pool)
             testApplication {
-                application { bumpMapApi(ObservationStore(pool), token) }
+                application { bumpMapApi(ObservationStore(pool), RecordingStore(pool), token) }
                 val submission = client.post("/v1/observations") {
                     bearerAuth(token)
                     contentType(geoJson)
@@ -75,7 +75,7 @@ class ObservationApiTest {
         databasePool(System.getenv()).use { pool ->
             migrate(pool)
             testApplication {
-                application { bumpMapApi(ObservationStore(pool), token) }
+                application { bumpMapApi(ObservationStore(pool), RecordingStore(pool), token) }
                 suspend fun save(vararg features: String) = client.post("/v1/observations") {
                     bearerAuth(token)
                     contentType(ContentType.Application.Json)
