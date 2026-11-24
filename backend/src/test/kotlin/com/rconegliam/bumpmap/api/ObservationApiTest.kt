@@ -1,0 +1,75 @@
+package com.rconegliam.bumpmap.api
+
+import io.ktor.client.request.bearerAuth
+import io.ktor.client.request.get
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.contentType
+import io.ktor.server.testing.testApplication
+import java.util.UUID
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+import kotlinx.serialization.json.Json
+
+class ObservationApiTest {
+    @Test
+    fun savesRetriesAndFiltersObservationsInPostgis() {
+        val token = "synthetic-token-for-local-tests-only"
+        val lineId = UUID.randomUUID().toString()
+        val pointId = UUID.randomUUID().toString()
+        val rolledBackId = UUID.randomUUID().toString()
+        val point = pointFeature(pointId)
+        val line = """
+            {"type":"Feature","id":"$lineId",
+            "geometry":{"type":"LineString","coordinates":[[-46.8772,-23.5112],[-46.8771,-23.5110]]},
+            "properties":{"kind":"segment","quality":"good","score":96,"roughness":0.2,"speed_kmh":36.0}}
+        """.trimIndent()
+        val bbox = "/v1/observations?bbox=-46.88,-23.52,-46.87,-23.50"
+        databasePool(System.getenv()).use { pool ->
+            migrate(pool)
+            testApplication {
+                application { bumpMapApi(ObservationStore(pool), token) }
+                suspend fun save(vararg features: String) = client.post("/v1/observations") {
+                    bearerAuth(token)
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"type":"FeatureCollection","features":[${features.joinToString()}]}""")
+                }
+                suspend fun read(url: String) =
+                    Json.decodeFromString<ObservationPage>(client.get(url) { bearerAuth(token) }.bodyAsText())
+
+                assertEquals(HttpStatusCode.OK, client.get("/health").status)
+                assertEquals(HttpStatusCode.Unauthorized, client.get(bbox).status)
+                assertEquals(HttpStatusCode.BadRequest,
+                    client.get("/v1/observations?bbox=1,2,3,4") { bearerAuth(token) }.status)
+                assertEquals(HttpStatusCode.BadRequest, save(point, point).status)
+                assertEquals(HttpStatusCode.BadRequest, save(point.replace("-46.8772", "181.0")).status)
+                assertEquals(HttpStatusCode.BadRequest, save(point.replace("speed_kmh", "user_trip_id")).status)
+                assertEquals(HttpStatusCode.PayloadTooLarge, save(" ".repeat(256 * 1024)).status)
+
+                assertEquals(HttpStatusCode.OK, save(line, point).status)
+                assertEquals(HttpStatusCode.OK, save(point, line).status)
+                assertEquals(HttpStatusCode.Conflict,
+                    save(pointFeature(rolledBackId), point.replace("pothole", "speed_bump")).status)
+
+                val result = read(bbox)
+                assertEquals("FeatureCollection", result.type)
+                assertTrue(result.features.any { it.id == lineId && it.geometry.type == "LineString" })
+                assertTrue(result.features.any { it.id == pointId && it.properties.eventType == "pothole" })
+                assertFalse(result.features.any { it.id == rolledBackId })
+                val otherArea = read("/v1/observations?bbox=-46.76,-23.60,-46.75,-23.59")
+                assertFalse(otherArea.features.any { it.id in setOf(lineId, pointId) })
+            }
+        }
+    }
+
+    private fun pointFeature(id: String): String = """
+        {"type":"Feature","id":"$id",
+        "geometry":{"type":"Point","coordinates":[-46.8772,-23.5112]},
+        "properties":{"kind":"event","type":"pothole","peak":5.1,"speed_kmh":28.0}}
+    """.trimIndent()
+}
