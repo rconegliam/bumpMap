@@ -1,6 +1,7 @@
 package com.rconegliam.bumpmap.map
 
 import android.graphics.Color
+import android.graphics.RectF
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,21 +15,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -38,16 +41,22 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rconegliam.bumpmap.R
 import com.rconegliam.bumpmap.detection.DetectionStore
 import com.rconegliam.bumpmap.detection.EventType
-import com.rconegliam.bumpmap.detection.GeoJson
+import com.rconegliam.bumpmap.detection.MEAN_SPEED
+import com.rconegliam.bumpmap.detection.POTHOLE_COUNT
+import com.rconegliam.bumpmap.detection.SPEED_BUMP_COUNT
+import com.rconegliam.bumpmap.detection.RoadMapMetrics
 import com.rconegliam.bumpmap.detection.RoadQuality
 import com.rconegliam.bumpmap.detection.color
 import com.rconegliam.bumpmap.detection.labelRes
+import com.rconegliam.bumpmap.sync.PilotMapApi
+import com.rconegliam.bumpmap.sync.RecordingSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.rconegliam.bumpmap.ui.currentLocale
 import org.maplibre.android.camera.CameraPosition
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
 import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
@@ -56,17 +65,27 @@ import org.maplibre.android.style.layers.Property
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.layers.SymbolLayer
 import org.maplibre.android.style.sources.GeoJsonSource
+import org.maplibre.geojson.Feature
+import org.maplibre.geojson.FeatureCollection
 
 private const val STYLE_URL = "https://tiles.openfreemap.org/styles/liberty"
 private const val DETECTIONS_SOURCE = "bumpmap-detections"
 private const val SEGMENTS_LAYER = "bumpmap-segments"
 private const val EVENTS_LAYER = "bumpmap-events"
+private const val SPEED_LAYER = "bumpmap-speeds"
+private const val MAP_QUALITY = "map_quality"
 
 // Between Barueri and São Paulo, the beta cities.
 private val START_POSITION = CameraPosition.Builder()
     .target(LatLng(-23.53, -46.76))
     .zoom(10.5)
     .build()
+
+private enum class MapFilter(val label: Int, val event: EventType?, val count: String?) {
+    ALL(R.string.map_filter_all, null, null),
+    POTHOLES(R.string.map_filter_potholes, EventType.POTHOLE, POTHOLE_COUNT),
+    BUMPS(R.string.map_filter_bumps, EventType.SPEED_BUMP, SPEED_BUMP_COUNT),
+}
 
 @Composable
 fun MapScreen(modifier: Modifier = Modifier) {
@@ -76,14 +95,54 @@ fun MapScreen(modifier: Modifier = Modifier) {
     MapLifecycle(mapView)
     val detectionsVersion by DetectionStore.version.collectAsStateWithLifecycle()
     var loadedStyle by remember { mutableStateOf<Style?>(null) }
-    var featureCount by remember { mutableIntStateOf(0) }
+    var map by remember { mutableStateOf<MapLibreMap?>(null) }
+    var localFeatures by remember { mutableStateOf<List<Feature>>(emptyList()) }
+    var pilotFeatures by remember { mutableStateOf<List<Feature>>(emptyList()) }
+    var viewport by remember { mutableStateOf<String?>(null) }
+    val token = RecordingSync.token(context)
+    var filter by rememberSaveable { mutableStateOf(MapFilter.ALL) }
+    var showSpeed by rememberSaveable { mutableStateOf(false) }
+    var selection by remember { mutableStateOf<RoadMapMetrics?>(null) }
+    val tapRadius = with(LocalDensity.current) { 12.dp.toPx() }
+    val features = remember(localFeatures, pilotFeatures) {
+        (localFeatures + pilotFeatures).distinctBy { it.id() }.onEach { feature ->
+            RoadMapMetrics.from(feature)?.let { feature.addStringProperty(MAP_QUALITY, it.quality.code) }
+        }
+    }
 
-    LaunchedEffect(loadedStyle, detectionsVersion) {
-        val style = loadedStyle ?: return@LaunchedEffect
-        val features = withContext(Dispatchers.IO) { DetectionStore.loadFeatures(context) }
-        featureCount = features.size
-        if (style.isFullyLoaded) {
-            style.getSourceAs<GeoJsonSource>(DETECTIONS_SOURCE)?.setGeoJson(GeoJson.collection(features))
+    LaunchedEffect(detectionsVersion) {
+        localFeatures = withContext(Dispatchers.IO) {
+            DetectionStore.loadMapFeatures(context, RecordingSync.installationId(context))
+        }
+    }
+    LaunchedEffect(token, viewport) {
+        val bbox = viewport
+        pilotFeatures = if (token == null || bbox == null) emptyList() else withContext(Dispatchers.IO) {
+            runCatching { PilotMapApi.readViewport(bbox, token) }.getOrDefault(emptyList())
+        }
+    }
+    LaunchedEffect(loadedStyle, features) {
+        loadedStyle?.getSourceAs<GeoJsonSource>(DETECTIONS_SOURCE)
+            ?.setGeoJson(FeatureCollection.fromFeatures(features))
+    }
+    LaunchedEffect(loadedStyle, filter, showSpeed) {
+        loadedStyle?.applyFilters(filter, showSpeed)
+    }
+    DisposableEffect(map, tapRadius) {
+        val currentMap = map ?: return@DisposableEffect onDispose {}
+        val idleListener = MapLibreMap.OnCameraIdleListener { viewport = currentMap.viewportBbox() }
+        val clickListener = MapLibreMap.OnMapClickListener { position ->
+            val pixel = currentMap.projection.toScreenLocation(position)
+            val area = RectF(pixel.x - tapRadius, pixel.y - tapRadius, pixel.x + tapRadius, pixel.y + tapRadius)
+            selection = currentMap.queryRenderedFeatures(area, SEGMENTS_LAYER)
+                .firstNotNullOfOrNull(RoadMapMetrics::from)
+            selection != null
+        }
+        currentMap.addOnMapClickListener(clickListener)
+        currentMap.addOnCameraIdleListener(idleListener)
+        onDispose {
+            currentMap.removeOnMapClickListener(clickListener)
+            currentMap.removeOnCameraIdleListener(idleListener)
         }
     }
 
@@ -92,18 +151,20 @@ fun MapScreen(modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxSize(),
             factory = {
                 mapView.apply {
-                    getMapAsync { map ->
-                        map.cameraPosition = START_POSITION
-                        map.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
+                    getMapAsync { readyMap ->
+                        readyMap.cameraPosition = START_POSITION
+                        readyMap.setStyle(Style.Builder().fromUri(STYLE_URL)) { style ->
                             localizeLabels(style, language)
                             addDetectionLayers(style)
                             loadedStyle = style
+                            viewport = readyMap.viewportBbox()
                         }
+                        map = readyMap
                     }
                 }
             },
         )
-        if (featureCount == 0) {
+        if (features.isEmpty()) {
             Card(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -116,25 +177,83 @@ fun MapScreen(modifier: Modifier = Modifier) {
                 )
             }
         } else {
-            Legend(
-                Modifier
-                    .align(Alignment.TopEnd)
+            MapControls(
+                filter = filter,
+                showSpeed = showSpeed,
+                onFilter = {
+                    filter = it
+                    selection = null
+                },
+                onShowSpeed = { showSpeed = !showSpeed },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
                     .padding(12.dp),
+            )
+        }
+        selection?.let { metrics ->
+            RoadDetails(metrics, Modifier.align(Alignment.BottomStart).padding(12.dp))
+        }
+    }
+}
+
+private fun MapLibreMap.viewportBbox(): String? {
+    val bounds = projection.visibleRegion.latLngBounds
+    val west = bounds.longitudeWest
+    val east = bounds.longitudeEast
+    val south = bounds.latitudeSouth
+    val north = bounds.latitudeNorth
+    if (west !in -180.0..180.0 || east !in -180.0..180.0 ||
+        east - west !in 0.000001..1.0 || north - south !in 0.000001..1.0
+    ) return null
+    return "$west,$south,$east,$north"
+}
+
+@Composable
+private fun MapControls(
+    filter: MapFilter,
+    showSpeed: Boolean,
+    onFilter: (MapFilter) -> Unit,
+    onShowSpeed: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier) {
+        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                MapFilter.entries.forEach { option ->
+                    FilterChip(
+                        selected = filter == option,
+                        onClick = { onFilter(option) },
+                        label = { Text(stringResource(option.label)) },
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                RoadQuality.entries.forEach { quality ->
+                    LegendRow(ComposeColor(quality.color), stringResource(quality.labelRes), isLine = true)
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                EventType.entries.filter { filter.event == null || it == filter.event }.forEach { type ->
+                    LegendRow(ComposeColor(type.color), stringResource(type.labelRes), isLine = false)
+                }
+            }
+            FilterChip(
+                selected = showSpeed,
+                onClick = onShowSpeed,
+                label = { Text(stringResource(R.string.map_show_speed)) },
             )
         }
     }
 }
 
 @Composable
-private fun Legend(modifier: Modifier = Modifier) {
+private fun RoadDetails(metrics: RoadMapMetrics, modifier: Modifier = Modifier) {
     Card(modifier) {
-        Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            RoadQuality.entries.forEach { quality ->
-                LegendRow(ComposeColor(quality.color), stringResource(quality.labelRes), isLine = true)
-            }
-            EventType.entries.forEach { type ->
-                LegendRow(ComposeColor(type.color), stringResource(type.labelRes), isLine = false)
-            }
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            LegendRow(ComposeColor(metrics.quality.color), stringResource(metrics.quality.labelRes), isLine = true)
+            Text(stringResource(R.string.map_mean_speed_value, metrics.meanSpeedKmh))
+            Text(stringResource(R.string.map_obstacle_counts, metrics.potholes, metrics.speedBumps))
+            Text(stringResource(R.string.map_penalty_points, metrics.penaltyPoints))
         }
     }
 }
@@ -154,14 +273,14 @@ private fun LegendRow(color: ComposeColor, label: String, isLine: Boolean) {
 
 /** Road segments colored by quality, with potholes and speed bumps as dots on top. */
 private fun addDetectionLayers(style: Style) {
-    style.addSource(GeoJsonSource(DETECTIONS_SOURCE, GeoJson.collection(emptyList())))
+    style.addSource(GeoJsonSource(DETECTIONS_SOURCE, FeatureCollection.fromFeatures(emptyArray<Feature>())))
     style.addLayer(
         LineLayer(SEGMENTS_LAYER, DETECTIONS_SOURCE)
             .withFilter(Expression.eq(Expression.get("kind"), Expression.literal("segment")))
             .withProperties(
                 PropertyFactory.lineColor(
                     Expression.match(
-                        Expression.get("quality"),
+                        Expression.get(MAP_QUALITY),
                         Expression.color(Color.GRAY),
                         *RoadQuality.entries.map { Expression.stop(it.code, Expression.color(it.color)) }.toTypedArray(),
                     ),
@@ -194,6 +313,41 @@ private fun addDetectionLayers(style: Style) {
                 PropertyFactory.circleStrokeWidth(2f),
             ),
     )
+    style.addLayer(
+        SymbolLayer(SPEED_LAYER, DETECTIONS_SOURCE)
+            .withProperties(
+                PropertyFactory.visibility(Property.NONE),
+                PropertyFactory.symbolPlacement(Property.SYMBOL_PLACEMENT_LINE_CENTER),
+                PropertyFactory.textField(
+                    Expression.concat(
+                        Expression.toString(Expression.round(Expression.get(MEAN_SPEED))),
+                        Expression.literal(" km/h"),
+                    ),
+                ),
+                PropertyFactory.textSize(12f),
+                PropertyFactory.textFont(arrayOf("Noto Sans Regular")),
+                PropertyFactory.textColor(Color.BLACK),
+                PropertyFactory.textHaloColor(Color.WHITE),
+                PropertyFactory.textHaloWidth(2f),
+            ),
+    )
+}
+
+private fun Style.applyFilters(filter: MapFilter, showSpeed: Boolean) {
+    val segments = Expression.eq(Expression.get("kind"), Expression.literal("segment"))
+    val events = Expression.eq(Expression.get("kind"), Expression.literal("event"))
+    val segmentFilter = filter.count?.let {
+        Expression.all(segments, Expression.gt(Expression.get(it), Expression.literal(0)))
+    } ?: segments
+    val eventFilter = filter.event?.let {
+        Expression.all(events, Expression.eq(Expression.get("type"), Expression.literal(it.code)))
+    } ?: events
+    getLayerAs<LineLayer>(SEGMENTS_LAYER)?.setFilter(segmentFilter)
+    getLayerAs<CircleLayer>(EVENTS_LAYER)?.setFilter(eventFilter)
+    getLayerAs<SymbolLayer>(SPEED_LAYER)?.apply {
+        setFilter(segmentFilter)
+        setProperties(PropertyFactory.visibility(if (showSpeed) Property.VISIBLE else Property.NONE))
+    }
 }
 
 @Composable

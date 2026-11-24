@@ -5,15 +5,16 @@ import androidx.work.Worker
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.rconegliam.bumpmap.recorder.RecordingStore
+import com.rconegliam.bumpmap.detection.archiveRecordingId
+import com.rconegliam.bumpmap.detection.mapFeatures
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.UUID
 
-private const val API = "https://api-pilot-13fd93fa.up.railway.app"
 private const val PART_BYTES = 512 * 1024
+private const val OBSERVATIONS_PER_BATCH = 40
 internal const val ARCHIVE_FULL = "recording-archive-full"
 private const val HTTP_INSUFFICIENT_STORAGE = 507
 
@@ -28,7 +29,11 @@ internal class RecordingUploadWorker(context: Context, parameters: WorkerParamet
         for (file in RecordingStore.archiveFiles(applicationContext)) {
             if (isStopped) return Result.retry()
             try {
-                when (uploadFile(file, installationId, token)) {
+                val archive = uploadFile(file, installationId, token)
+                val result = if (archive == HttpURLConnection.HTTP_NO_CONTENT && file.extension == "ndjson") {
+                    publishDetections(file, installationId, token)
+                } else archive
+                when (result) {
                     HttpURLConnection.HTTP_NO_CONTENT -> Unit
                     HttpURLConnection.HTTP_UNAUTHORIZED, HttpURLConnection.HTTP_FORBIDDEN -> return Result.failure()
                     HTTP_INSUFFICIENT_STORAGE -> archiveFull = true
@@ -48,7 +53,7 @@ internal class RecordingUploadWorker(context: Context, parameters: WorkerParamet
     }
 
     private fun uploadFile(file: File, installationId: String, token: String): Int {
-        val id = UUID.nameUUIDFromBytes("$installationId/${file.nameWithoutExtension}".encodeToByteArray())
+        val id = archiveRecordingId(installationId, file.nameWithoutExtension)
         val progressKey = "$id/${file.extension}"
         val nextPart = checkpoint.getInt(progressKey, 0)
         RandomAccessFile(file, "r").use { input ->
@@ -74,8 +79,24 @@ internal class RecordingUploadWorker(context: Context, parameters: WorkerParamet
         return HttpURLConnection.HTTP_NO_CONTENT
     }
 
+    private fun publishDetections(file: File, installationId: String, token: String): Int {
+        val id = archiveRecordingId(installationId, file.nameWithoutExtension)
+        val publishedKey = "$id/map-v1"
+        if (checkpoint.getBoolean(publishedKey, false)) return HttpURLConnection.HTTP_NO_CONTENT
+        val features = file.useLines { mapFeatures(it, id) }
+        for (batch in features.chunked(OBSERVATIONS_PER_BATCH)) {
+            if (isStopped || RecordingSync.token(applicationContext) != token) {
+                return HttpURLConnection.HTTP_CLIENT_TIMEOUT
+            }
+            val status = PilotMapApi.publish(batch, token)
+            if (status != HttpURLConnection.HTTP_OK) return status
+        }
+        if (!checkpoint.edit().putBoolean(publishedKey, true).commit()) throw IOException("Map upload checkpoint")
+        return HttpURLConnection.HTTP_NO_CONTENT
+    }
+
     private fun putPart(path: String, bytes: ByteArray, token: String): Int {
-        val connection = URL(API + path).openConnection() as HttpURLConnection
+        val connection = URL(PILOT_API + path).openConnection() as HttpURLConnection
         try {
             connection.requestMethod = "PUT"
             connection.connectTimeout = 15_000

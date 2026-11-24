@@ -51,6 +51,11 @@ To reconstruct a file, read the matching `recording_file_parts.contents` bytes
 in `part_number` order and concatenate them. The archive has no HTTP download
 route. Its NDJSON files are separate from the shared road-observation endpoint.
 
+After archiving a recording, Android publishes its measured sections and events
+to the observation API. Sections include the mean measured speed in km/h and
+separate pothole and speed bump counts. The Android map requests these
+observations with `from_recordings=true`.
+
 ## Local verification
 
 With JDK 17 and Docker installed, run from the repository root.

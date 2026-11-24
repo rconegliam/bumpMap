@@ -29,13 +29,14 @@ internal class ObservationStore(private val database: DataSource) {
         }
     }
 
-    fun lookup(box: BoundingBox, after: UUID?): ObservationPage {
+    fun lookup(box: BoundingBox, after: UUID?, fromRecordings: Boolean): ObservationPage {
         val features = database.connection.use { connection ->
             connection.prepareStatement(
                 """
                 SELECT feature FROM road_observations
                 WHERE ST_Intersects(geometry, ST_MakeEnvelope(?, ?, ?, ?, 4326))
                   AND (?::uuid IS NULL OR id > ?::uuid)
+                  AND (NOT ? OR feature->'properties'->>'recording_id' IS NOT NULL)
                 ORDER BY id LIMIT ?
                 """.trimIndent(),
             ).use { statement ->
@@ -45,7 +46,8 @@ internal class ObservationStore(private val database: DataSource) {
                 statement.setDouble(4, box.north)
                 statement.setObject(5, after)
                 statement.setObject(6, after)
-                statement.setInt(7, PAGE_SIZE + 1)
+                statement.setBoolean(7, fromRecordings)
+                statement.setInt(8, PAGE_SIZE + 1)
                 statement.executeQuery().use { rows ->
                     buildList {
                         while (rows.next()) add(Json.decodeFromString<Observation>(rows.getString(1)))

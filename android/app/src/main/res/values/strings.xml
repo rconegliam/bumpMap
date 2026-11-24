@@ -6,7 +6,14 @@
     <string name="tab_record">Record</string>
     <string name="tab_settings">Settings</string>
 
-    <string name="map_no_data">Record a drive to see road quality here. The shared map with everyone\'s drives comes next.</string>
+    <string name="map_no_data">Record a drive to see measured roads here.</string>
+    <string name="map_filter_all">All</string>
+    <string name="map_filter_potholes">Potholes</string>
+    <string name="map_filter_bumps">Speed bumps</string>
+    <string name="map_show_speed">Average speed</string>
+    <string name="map_mean_speed_value">Average speed %1$.1f km/h</string>
+    <string name="map_obstacle_counts">Potholes %1$d · Speed bumps %2$d</string>
+    <string name="map_penalty_points">Penalty points %1$d</string>
 
     <string name="record_title">Drive recorder</string>
     <string name="record_description">Drive with the phone in a holder. BumpMap measures how much the car shakes, rates each stretch of road and detects potholes and speed bumps automatically.</string>
@@ -58,7 +65,7 @@
     <string name="settings_version">Version %1$s</string>
     <string name="settings_map_data">Map data © OpenStreetMap contributors. Base map by OpenFreeMap.</string>
     <string name="sync_title">Recording sync</string>
-    <string name="sync_description">Send saved and future recordings to the BumpMap pilot database on an unmetered network. Uploads include GPS routes, sensor readings, manual marks, and automatic detections. You can turn off future uploads here.</string>
+    <string name="sync_description">Send saved and future recordings to the BumpMap pilot database on an unmetered network. Uploads include GPS routes, sensor readings, manual marks, and automatic detections. Measured road sections, average speeds, and detections appear on the shared pilot map. You can turn off future uploads here.</string>
     <string name="sync_token">Pilot access token</string>
     <string name="sync_enable">Enable sync</string>
     <string name="sync_update_token">Update token</string>

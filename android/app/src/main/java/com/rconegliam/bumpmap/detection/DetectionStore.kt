@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.io.File
+import java.io.IOException
 
 /**
  * Detected segments and events, one GeoJSON feature per line, one file per recording. Kept even when
@@ -28,10 +29,16 @@ object DetectionStore {
             ?.toList()
             .orEmpty()
 
-    fun loadFeatures(context: Context): List<String> =
+    internal fun loadMapFeatures(context: Context, installationId: String) =
         list(context)
             .sortedBy { it.name }
-            .flatMap { file -> file.readLines().filter { it.startsWith("{") && it.endsWith("}") } }
+            .flatMap { file ->
+                try {
+                    file.useLines { mapFeatures(it, archiveRecordingId(installationId, file.nameWithoutExtension)) }
+                } catch (_: IOException) {
+                    emptyList()
+                }
+            }
 
     private fun dir(context: Context): File = File(context.filesDir, DIR).apply { mkdirs() }
 }

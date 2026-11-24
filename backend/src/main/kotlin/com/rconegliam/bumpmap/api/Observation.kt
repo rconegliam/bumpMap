@@ -37,16 +37,19 @@ internal data class Observation(
         if (type != "Feature" || parseId(id) == null || !properties.speedKmh.isFinite() ||
             properties.speedKmh < 0
         ) return false
+        if (properties.recordingId != null && parseId(properties.recordingId) == null) return false
 
         val coordinates = geometry.coordinates
         return when (properties.kind) {
             "segment" -> geometry.type == "LineString" &&
                 coordinates.isLine() &&
                 properties.quality in qualities && properties.score != null && properties.score in 0..100 &&
-                properties.roughness.isMagnitude() && properties.eventType == null && properties.peak == null
+                properties.roughness.isMagnitude() && properties.eventType == null && properties.peak == null &&
+                properties.validObstacleCounts()
             "event" -> geometry.type == "Point" && coordinates.position() != null &&
                 properties.eventType in eventTypes && properties.peak.isMagnitude() &&
-                properties.quality == null && properties.score == null && properties.roughness == null
+                properties.quality == null && properties.score == null && properties.roughness == null &&
+                properties.potholes == null && properties.speedBumps == null
             else -> false
         }
     }
@@ -64,7 +67,16 @@ internal data class ObservationProperties(
     val roughness: Double? = null,
     @SerialName("type") val eventType: String? = null,
     val peak: Double? = null,
-)
+    @SerialName("recording_id") val recordingId: String? = null,
+    val potholes: Int? = null,
+    @SerialName("speed_bumps") val speedBumps: Int? = null,
+) {
+    fun validObstacleCounts() = if (recordingId == null) {
+        potholes == null && speedBumps == null
+    } else {
+        potholes != null && potholes >= 0 && speedBumps != null && speedBumps >= 0
+    }
+}
 
 internal data class BoundingBox(val west: Double, val south: Double, val east: Double, val north: Double) {
     companion object {

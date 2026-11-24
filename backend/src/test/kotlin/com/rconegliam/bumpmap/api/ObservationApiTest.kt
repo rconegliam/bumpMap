@@ -65,12 +65,18 @@ class ObservationApiTest {
         val lineId = UUID.randomUUID().toString()
         val pointId = UUID.randomUUID().toString()
         val rolledBackId = UUID.randomUUID().toString()
+        val measuredId = UUID.randomUUID().toString()
+        val recordingId = UUID.randomUUID().toString()
         val point = pointFeature(pointId)
         val line = """
             {"type":"Feature","id":"$lineId",
             "geometry":{"type":"LineString","coordinates":[[-46.8772,-23.5112],[-46.8771,-23.5110]]},
             "properties":{"kind":"segment","quality":"good","score":96,"roughness":0.2,"speed_kmh":36.0}}
         """.trimIndent()
+        val measured = line.replace(lineId, measuredId)
+            .replace("\"speed_kmh\":36.0", """
+                "speed_kmh":42.75,"recording_id":"$recordingId","potholes":2,"speed_bumps":1
+            """.trimIndent())
         val bbox = "/v1/observations?bbox=-46.88,-23.52,-46.87,-23.50"
         databasePool(System.getenv()).use { pool ->
             migrate(pool)
@@ -95,6 +101,9 @@ class ObservationApiTest {
 
                 assertEquals(HttpStatusCode.OK, save(line, point).status)
                 assertEquals(HttpStatusCode.OK, save(point, line).status)
+                assertEquals(HttpStatusCode.BadRequest, save(measured.replace("\"potholes\":2", "\"potholes\":-2")).status)
+                assertEquals(HttpStatusCode.OK, save(measured).status)
+                assertEquals(HttpStatusCode.OK, save(measured).status)
                 assertEquals(HttpStatusCode.Conflict,
                     save(pointFeature(rolledBackId), point.replace("pothole", "speed_bump")).status)
 
@@ -113,6 +122,12 @@ class ObservationApiTest {
                 )
                 val otherArea = read("/v1/observations?bbox=-46.76,-23.60,-46.75,-23.59")
                 assertFalse(otherArea.features.any { it.id in setOf(lineId, pointId) })
+                val fromRecordings = read("$bbox&from_recordings=true").features
+                assertFalse(fromRecordings.any { it.id in setOf(lineId, pointId) })
+                val measurements = fromRecordings.single { it.id == measuredId }.properties
+                assertEquals(42.75, measurements.speedKmh)
+                assertEquals(2, measurements.potholes)
+                assertEquals(1, measurements.speedBumps)
             }
         }
     }

@@ -143,11 +143,12 @@ internal fun Application.bumpMapApi(store: ObservationStore, recordings: Recordi
                     val box = BoundingBox.parse(call.request.queryParameters["bbox"])
                     val rawCursor = call.request.queryParameters["after"]
                     val after = rawCursor?.let(::parseId)
+                    val fromRecordings = call.request.queryParameters["from_recordings"] == "true"
                     if (box == null || (rawCursor != null && after == null)) {
                         call.respond(HttpStatusCode.BadRequest, ApiError("invalid_bbox_or_cursor"))
                         return@get
                     }
-                    call.respond(withContext(Dispatchers.IO) { store.lookup(box, after) })
+                    call.respond(withContext(Dispatchers.IO) { store.lookup(box, after, fromRecordings) })
                 }
                 post {
                     call.response.header(HttpHeaders.CacheControl, "no-store")
