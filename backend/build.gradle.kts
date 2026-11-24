@@ -4,10 +4,6 @@ plugins {
     kotlin("plugin.serialization") version "2.3.21"
 }
 
-repositories {
-    mavenCentral()
-}
-
 val ktorVersion = "3.5.2"
 val flywayVersion = "11.18.0"
 
