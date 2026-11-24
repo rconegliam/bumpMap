@@ -10,6 +10,9 @@ import kotlinx.serialization.json.doubleOrNull
 internal const val MAX_BATCH_SIZE = 100
 internal const val PAGE_SIZE = 500
 
+// Allow for rounding when subtracting coordinates at the largest valid magnitude.
+private val MAX_BOX_SPAN = 1.0 + Math.ulp(180.0)
+
 @Serializable
 internal data class ObservationBatch(
     val type: String,
@@ -72,7 +75,8 @@ internal data class BoundingBox(val west: Double, val south: Double, val east: D
             val box = BoundingBox(west, south, east, north)
             if (west !in -180.0..180.0 || east !in -180.0..180.0 ||
                 south !in -90.0..90.0 || north !in -90.0..90.0 ||
-                east - west <= 0 || east - west > 1 || north - south <= 0 || north - south > 1
+                east <= west || north <= south ||
+                east - west > MAX_BOX_SPAN || north - south > MAX_BOX_SPAN
             ) return null
             return box
         }
