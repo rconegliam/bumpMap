@@ -88,6 +88,15 @@ class RecordingApiTest {
                 assertEquals(HttpStatusCode.NoContent, upload(0, csvStart))
                 assertEquals(HttpStatusCode.Conflict, upload(0, ByteArray(RECORDING_PART_BYTES)))
                 assertEquals(HttpStatusCode.Conflict, upload(2, csvEnd, parts = 3))
+                pool.connection.use { connection ->
+                    connection.prepareStatement("DELETE FROM recording_files WHERE recording_id = ?").use { statement ->
+                        statement.setObject(1, id)
+                        statement.executeUpdate()
+                    }
+                }
+                assertEquals(HttpStatusCode.PreconditionFailed, upload(1, csvEnd))
+                assertEquals(0, completedFiles(pool, id))
+                assertEquals(HttpStatusCode.NoContent, upload(0, csvStart))
                 assertEquals(HttpStatusCode.NoContent, upload(1, csvEnd))
                 assertEquals(HttpStatusCode.NoContent, upload(0, byteArrayOf(), "ndjson", 1))
                 assertEquals(2, completedFiles(pool, id))

@@ -39,7 +39,8 @@ The archive endpoint requires the same bearer token and accepts
 `csv` and `ndjson` files. Each request includes an original file name, total
 part count, and zero-based part number. Parts are 512 KiB except for the last.
 An empty file is one empty part. A repeated identical part returns 204, while a
-changed part or file description returns 409.
+changed part or file description returns 409. Upload parts in order. If earlier
+parts are missing, HTTP 412 tells the client to restart from part zero.
 The archive has its own storage quota of 512 MiB by default, configurable with
 `BUMPMAP_ARCHIVE_MAX_BYTES`. The quota includes a 4 KiB allowance per part.
 HTTP 507 means new parts no longer fit. Identical retries still return 204,

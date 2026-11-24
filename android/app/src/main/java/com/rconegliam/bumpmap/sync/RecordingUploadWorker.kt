@@ -31,7 +31,8 @@ internal class RecordingUploadWorker(context: Context, parameters: WorkerParamet
                     HttpURLConnection.HTTP_NO_CONTENT -> Unit
                     HttpURLConnection.HTTP_UNAUTHORIZED, HttpURLConnection.HTTP_FORBIDDEN -> return Result.failure()
                     HTTP_INSUFFICIENT_STORAGE -> return Result.failure(workDataOf(ARCHIVE_FULL to true))
-                    HttpURLConnection.HTTP_CLIENT_TIMEOUT, 429, in 500..599 -> return Result.retry()
+                    HttpURLConnection.HTTP_CLIENT_TIMEOUT, HttpURLConnection.HTTP_PRECON_FAILED,
+                    429, in 500..599 -> return Result.retry()
                     else -> hasRejectedFile = true
                 }
             } catch (_: IOException) {
@@ -58,6 +59,9 @@ internal class RecordingUploadWorker(context: Context, parameters: WorkerParamet
                 input.readFully(bytes)
                 val path = "/v1/recordings/$id/${file.extension}/$number?parts=$parts&name=${file.name}"
                 val status = putPart(path, bytes, token)
+                if (status == HttpURLConnection.HTTP_PRECON_FAILED &&
+                    !checkpoint.edit().remove(progressKey).commit()
+                ) throw IOException("Reset upload checkpoint")
                 if (status != HttpURLConnection.HTTP_NO_CONTENT) return status
                 if (!checkpoint.edit().putInt(progressKey, number + 1).commit()) throw IOException("Upload checkpoint")
             }

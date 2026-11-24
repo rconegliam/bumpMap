@@ -128,6 +128,8 @@ internal fun Application.bumpMapApi(store: ObservationStore, recordings: Recordi
                             RecordingSaveResult.STORED -> call.respond(HttpStatusCode.NoContent)
                             RecordingSaveResult.CONFLICT ->
                                 call.respond(HttpStatusCode.Conflict, ApiError("recording_part_conflict"))
+                            RecordingSaveResult.MISSING_EARLIER_PARTS ->
+                                call.respond(HttpStatusCode.PreconditionFailed, ApiError("recording_parts_missing"))
                             RecordingSaveResult.ARCHIVE_FULL ->
                                 call.respond(HttpStatusCode.InsufficientStorage, ApiError("recording_archive_full"))
                         }

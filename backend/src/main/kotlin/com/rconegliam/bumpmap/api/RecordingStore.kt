@@ -26,7 +26,7 @@ internal data class RecordingPart(
     }
 }
 
-internal enum class RecordingSaveResult { STORED, CONFLICT, ARCHIVE_FULL }
+internal enum class RecordingSaveResult { STORED, CONFLICT, MISSING_EARLIER_PARTS, ARCHIVE_FULL }
 
 internal class RecordingStore(
     private val database: DataSource,
@@ -46,14 +46,35 @@ internal class RecordingStore(
                 rows.getBoolean(1)
             }
         }
-        val result = existingPart(connection, part, bytes) ?: if (hasCapacity) {
-            insertPart(connection, part, bytes)
-            RecordingSaveResult.STORED
-        } else {
-            RecordingSaveResult.ARCHIVE_FULL
+        val existing = existingPart(connection, part, bytes)
+        val result = when {
+            existing == RecordingSaveResult.CONFLICT -> existing
+            !hasEarlierParts(connection, part) -> RecordingSaveResult.MISSING_EARLIER_PARTS
+            existing != null -> existing
+            !hasCapacity -> RecordingSaveResult.ARCHIVE_FULL
+            else -> {
+                insertPart(connection, part, bytes)
+                RecordingSaveResult.STORED
+            }
         }
         connection.commit()
         result
+    }
+
+    private fun hasEarlierParts(connection: Connection, part: RecordingPart): Boolean {
+        if (part.number == 0) return true
+        return connection.prepareStatement(
+            """SELECT count(*) FROM recording_file_parts
+               WHERE recording_id = ? AND kind = ? AND part_number < ?""",
+        ).use { statement ->
+            statement.setObject(1, part.id)
+            statement.setString(2, part.kind)
+            statement.setInt(3, part.number)
+            statement.executeQuery().use { rows ->
+                rows.next()
+                rows.getLong(1) == part.number.toLong()
+            }
+        }
     }
 
     private fun existingPart(connection: Connection, part: RecordingPart, bytes: ByteArray): RecordingSaveResult? =
