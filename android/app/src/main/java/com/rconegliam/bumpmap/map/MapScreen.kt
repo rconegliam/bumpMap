@@ -49,6 +49,7 @@ import com.rconegliam.bumpmap.detection.RoadQuality
 import com.rconegliam.bumpmap.detection.color
 import com.rconegliam.bumpmap.detection.labelRes
 import com.rconegliam.bumpmap.sync.PilotMapApi
+import com.rconegliam.bumpmap.sync.PilotViewport
 import com.rconegliam.bumpmap.sync.RecordingSync
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -97,15 +98,15 @@ fun MapScreen(modifier: Modifier = Modifier) {
     var loadedStyle by remember { mutableStateOf<Style?>(null) }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var localFeatures by remember { mutableStateOf<List<Feature>>(emptyList()) }
-    var pilotFeatures by remember { mutableStateOf<List<Feature>>(emptyList()) }
+    var pilotViewport by remember { mutableStateOf<PilotViewport?>(null) }
     var viewport by remember { mutableStateOf<String?>(null) }
     val token = RecordingSync.token(context)
     var filter by rememberSaveable { mutableStateOf(MapFilter.ALL) }
     var showSpeed by rememberSaveable { mutableStateOf(false) }
     var selection by remember { mutableStateOf<RoadMapMetrics?>(null) }
     val tapRadius = with(LocalDensity.current) { 12.dp.toPx() }
-    val features = remember(localFeatures, pilotFeatures) {
-        (localFeatures + pilotFeatures).distinctBy { it.id() }.onEach { feature ->
+    val features = remember(localFeatures, pilotViewport) {
+        (localFeatures + pilotViewport?.features.orEmpty()).distinctBy { it.id() }.onEach { feature ->
             RoadMapMetrics.from(feature)?.let { feature.addStringProperty(MAP_QUALITY, it.quality.code) }
         }
     }
@@ -117,8 +118,8 @@ fun MapScreen(modifier: Modifier = Modifier) {
     }
     LaunchedEffect(token, viewport) {
         val bbox = viewport
-        pilotFeatures = if (token == null || bbox == null) emptyList() else withContext(Dispatchers.IO) {
-            runCatching { PilotMapApi.readViewport(bbox, token) }.getOrDefault(emptyList())
+        pilotViewport = if (token == null || bbox == null) null else withContext(Dispatchers.IO) {
+            runCatching { PilotMapApi.readViewport(bbox, token) }.getOrNull()
         }
     }
     LaunchedEffect(loadedStyle, features) {
@@ -180,6 +181,7 @@ fun MapScreen(modifier: Modifier = Modifier) {
             MapControls(
                 filter = filter,
                 showSpeed = showSpeed,
+                canZoomForMore = pilotViewport?.hasMore == true,
                 onFilter = {
                     filter = it
                     selection = null
@@ -212,6 +214,7 @@ private fun MapLibreMap.viewportBbox(): String? {
 private fun MapControls(
     filter: MapFilter,
     showSpeed: Boolean,
+    canZoomForMore: Boolean,
     onFilter: (MapFilter) -> Unit,
     onShowSpeed: () -> Unit,
     modifier: Modifier = Modifier,
@@ -242,6 +245,9 @@ private fun MapControls(
                 onClick = onShowSpeed,
                 label = { Text(stringResource(R.string.map_show_speed)) },
             )
+            if (canZoomForMore) {
+                Text(stringResource(R.string.map_zoom_for_more), style = MaterialTheme.typography.bodySmall)
+            }
         }
     }
 }

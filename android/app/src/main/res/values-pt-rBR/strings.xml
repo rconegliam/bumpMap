@@ -11,6 +11,7 @@
     <string name="map_filter_potholes">Buracos</string>
     <string name="map_filter_bumps">Lombadas</string>
     <string name="map_show_speed">Velocidade média</string>
+    <string name="map_zoom_for_more">Aproxime o mapa para ver mais vias compartilhadas.</string>
     <string name="map_mean_speed_value">Velocidade média de %1$.1f km/h</string>
     <string name="map_obstacle_counts">Buracos %1$d · Lombadas %2$d</string>
     <string name="map_penalty_points">Pontos de penalidade %1$d</string>

@@ -11,6 +11,7 @@
     <string name="map_filter_potholes">Potholes</string>
     <string name="map_filter_bumps">Speed bumps</string>
     <string name="map_show_speed">Average speed</string>
+    <string name="map_zoom_for_more">Zoom in to see more shared roads.</string>
     <string name="map_mean_speed_value">Average speed %1$.1f km/h</string>
     <string name="map_obstacle_counts">Potholes %1$d · Speed bumps %2$d</string>
     <string name="map_penalty_points">Penalty points %1$d</string>

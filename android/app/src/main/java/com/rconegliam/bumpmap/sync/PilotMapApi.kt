@@ -3,6 +3,8 @@ package com.rconegliam.bumpmap.sync
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import com.google.gson.JsonParser
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -10,6 +12,8 @@ import java.net.URL
 internal const val PILOT_API = "https://api-pilot-13fd93fa.up.railway.app"
 private const val OBSERVATIONS = "/v1/observations"
 private const val MAX_VIEWPORT_PAGES = 4
+
+internal data class PilotViewport(val features: List<Feature>, val hasMore: Boolean)
 
 internal object PilotMapApi {
     fun publish(features: List<Feature>, token: String): Int {
@@ -28,10 +32,11 @@ internal object PilotMapApi {
         }
     }
 
-    fun readViewport(bbox: String, token: String): List<Feature> {
+    suspend fun readViewport(bbox: String, token: String): PilotViewport {
         val features = mutableListOf<Feature>()
         var cursor: String? = null
         repeat(MAX_VIEWPORT_PAGES) {
+            currentCoroutineContext().ensureActive()
             val after = cursor?.let { "&after=$it" }.orEmpty()
             val connection = connection("$OBSERVATIONS?bbox=$bbox&from_recordings=true$after", token)
             val json = try {
@@ -43,9 +48,9 @@ internal object PilotMapApi {
             val page = JsonParser.parseString(json).asJsonObject
             page.getAsJsonArray("features").forEach { features.add(Feature.fromJson(it.toString())) }
             cursor = page.get("next_cursor")?.takeUnless { it.isJsonNull }?.asString
-            if (cursor == null) return features
+            if (cursor == null) return PilotViewport(features, hasMore = false)
         }
-        return features
+        return PilotViewport(features, hasMore = true)
     }
 
     private fun connection(path: String, token: String) =
