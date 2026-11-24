@@ -1,5 +1,6 @@
 package com.rconegliam.bumpmap.api
 
+import io.ktor.client.request.accept
 import io.ktor.client.request.bearerAuth
 import io.ktor.client.request.get
 import io.ktor.client.request.post
@@ -20,6 +21,33 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 class ObservationApiTest {
+    @Test
+    fun acceptsAndServesGeoJsonMediaType() {
+        val token = "synthetic-token-for-local-tests-only"
+        val id = UUID.randomUUID().toString()
+        val geoJson = ContentType.parse("application/geo+json")
+        databasePool(System.getenv()).use { pool ->
+            migrate(pool)
+            testApplication {
+                application { bumpMapApi(ObservationStore(pool), token) }
+                val submission = client.post("/v1/observations") {
+                    bearerAuth(token)
+                    contentType(geoJson)
+                    setBody("""{"type":"FeatureCollection","features":[${pointFeature(id)}]}""")
+                }
+                assertEquals(HttpStatusCode.OK, submission.status)
+
+                val response = client.get("/v1/observations?bbox=-46.88,-23.52,-46.87,-23.50") {
+                    bearerAuth(token)
+                    accept(geoJson)
+                }
+                assertEquals(HttpStatusCode.OK, response.status)
+                assertEquals(geoJson, response.contentType()?.withoutParameters())
+                assertTrue(Json.decodeFromString<ObservationPage>(response.bodyAsText()).features.any { it.id == id })
+            }
+        }
+    }
+
     @Test
     fun savesRetriesAndFiltersObservationsInPostgis() {
         val token = "synthetic-token-for-local-tests-only"

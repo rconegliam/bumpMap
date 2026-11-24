@@ -34,6 +34,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 private const val MAX_BODY_BYTES = 256L * 1024
+private val GEO_JSON = ContentType("application", "geo+json")
 
 fun main() {
     val env = System.getenv()
@@ -50,7 +51,10 @@ fun main() {
 internal fun Application.bumpMapApi(store: ObservationStore, token: String) {
     val tokenBytes = token.toByteArray()
     val logger = environment.log
-    install(ContentNegotiation) { json(Json) }
+    install(ContentNegotiation) {
+        json(Json)
+        json(Json, GEO_JSON)
+    }
     install(Authentication) {
         bearer {
             authenticate { credential ->
@@ -100,7 +104,8 @@ internal fun Application.bumpMapApi(store: ObservationStore, token: String) {
                 }
                 post {
                     call.response.header(HttpHeaders.CacheControl, "no-store")
-                    if (!call.request.contentType().match(ContentType.Application.Json)) {
+                    val contentType = call.request.contentType()
+                    if (!contentType.match(ContentType.Application.Json) && !contentType.match(GEO_JSON)) {
                         call.respond(HttpStatusCode.UnsupportedMediaType, ApiError("expected_json"))
                         return@post
                     }

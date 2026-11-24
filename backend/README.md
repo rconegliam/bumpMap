@@ -8,10 +8,12 @@ described in the [plan](../docs/PLAN.md).
 | Method | Path | Result |
 | --- | --- | --- |
 | GET | `/health` | 200 when the API can reach PostgreSQL, otherwise 503 |
-| POST | `/v1/observations` | Accepts a JSON GeoJSON FeatureCollection with 1 to 100 observations and returns the accepted count |
+| POST | `/v1/observations` | Accepts a GeoJSON FeatureCollection with 1 to 100 observations and returns the accepted count |
 | GET | `/v1/observations?bbox=west,south,east,north` | Returns up to 500 intersecting features in a GeoJSON FeatureCollection |
 
 Both observation routes require `Authorization: Bearer <BUMPMAP_API_TOKEN>`.
+Use `Content-Type: application/json` or `application/geo+json` to submit observations.
+Send `Accept: application/geo+json` to request that media type when reading them.
 Pass the returned `next_cursor` as `after` with the same bounding box to read
 the next page. Bounding boxes use longitude and latitude in degrees and can
 span up to one degree on each axis.
