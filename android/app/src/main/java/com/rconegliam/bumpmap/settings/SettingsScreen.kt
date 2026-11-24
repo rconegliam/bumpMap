@@ -39,6 +39,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.rconegliam.bumpmap.BuildConfig
 import com.rconegliam.bumpmap.R
+import com.rconegliam.bumpmap.sync.ARCHIVE_FULL
 import com.rconegliam.bumpmap.sync.RecordingSync
 
 /** Language tags offered in the app. An empty tag means "follow the system language". */
@@ -109,6 +110,7 @@ private fun RecordingSyncSettings() {
         !enabled -> R.string.sync_off
         work.any { it.state == WorkInfo.State.RUNNING } -> R.string.sync_running
         work.any { !it.state.isFinished } -> R.string.sync_pending
+        work.any { it.outputData.getBoolean(ARCHIVE_FULL, false) } -> R.string.sync_archive_full
         work.any { it.state == WorkInfo.State.FAILED } -> R.string.sync_failed
         else -> R.string.sync_up_to_date
     }

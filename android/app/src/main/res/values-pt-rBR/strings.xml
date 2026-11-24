@@ -68,5 +68,6 @@
     <string name="sync_pending">Aguardando sincronização</string>
     <string name="sync_running">Sincronizando gravações</string>
     <string name="sync_failed">Falha na sincronização. Confira ou atualize o token do piloto.</string>
+    <string name="sync_archive_full">O arquivo do piloto está cheio. As gravações continuam salvas neste aparelho.</string>
     <string name="sync_up_to_date">Gravações sincronizadas</string>
 </resources>

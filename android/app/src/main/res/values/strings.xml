@@ -67,5 +67,6 @@
     <string name="sync_pending">Waiting to sync</string>
     <string name="sync_running">Syncing recordings</string>
     <string name="sync_failed">Sync failed. Check or update the pilot token.</string>
+    <string name="sync_archive_full">The pilot archive is full. Your recordings are still saved on this device.</string>
     <string name="sync_up_to_date">Recordings are up to date</string>
 </resources>

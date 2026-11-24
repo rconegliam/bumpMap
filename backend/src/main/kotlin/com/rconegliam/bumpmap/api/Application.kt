@@ -46,10 +46,12 @@ fun main() {
     val env = System.getenv()
     val token = env.getValue("BUMPMAP_API_TOKEN")
     require(token.length >= 32) { "BUMPMAP_API_TOKEN must be at least 32 characters" }
+    val archiveLimit = env["BUMPMAP_ARCHIVE_MAX_BYTES"]?.toLong() ?: DEFAULT_ARCHIVE_MAX_BYTES
+    require(archiveLimit > 0) { "BUMPMAP_ARCHIVE_MAX_BYTES must be positive" }
     databasePool(env).use { pool ->
         migrate(pool)
         embeddedServer(Netty, host = "0.0.0.0", port = env["PORT"]?.toInt() ?: 8080) {
-            bumpMapApi(ObservationStore(pool), RecordingStore(pool), token)
+            bumpMapApi(ObservationStore(pool), RecordingStore(pool, archiveLimit), token)
         }.start(wait = true)
     }
 }
@@ -121,10 +123,14 @@ internal fun Application.bumpMapApi(store: ObservationStore, recordings: Recordi
                     val bytes = call.receive<ByteArray>()
                     if (!part.validSize(bytes.size)) {
                         call.respond(HttpStatusCode.BadRequest, ApiError("invalid_recording_part_size"))
-                    } else if (withContext(Dispatchers.IO) { recordings.save(part, bytes) }) {
-                        call.respond(HttpStatusCode.NoContent)
                     } else {
-                        call.respond(HttpStatusCode.Conflict, ApiError("recording_part_conflict"))
+                        when (withContext(Dispatchers.IO) { recordings.save(part, bytes) }) {
+                            RecordingSaveResult.STORED -> call.respond(HttpStatusCode.NoContent)
+                            RecordingSaveResult.CONFLICT ->
+                                call.respond(HttpStatusCode.Conflict, ApiError("recording_part_conflict"))
+                            RecordingSaveResult.ARCHIVE_FULL ->
+                                call.respond(HttpStatusCode.InsufficientStorage, ApiError("recording_archive_full"))
+                        }
                     }
                 }
             }

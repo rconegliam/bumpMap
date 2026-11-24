@@ -15,6 +15,47 @@ import kotlin.test.assertEquals
 
 class RecordingApiTest {
     @Test
+    fun rejectsNewPartsAtCapacityAndStillAcceptsRetries() {
+        val token = "synthetic-token-for-local-tests-only"
+        val first = UUID.randomUUID()
+        val second = UUID.randomUUID()
+        databasePool(System.getenv()).use { pool ->
+            migrate(pool)
+            val currentBytes = pool.connection.use { connection ->
+                connection.createStatement().use { statement ->
+                    statement.executeQuery("SELECT charged_bytes FROM recording_archive_usage").use { rows ->
+                        rows.next()
+                        rows.getLong(1)
+                    }
+                }
+            }
+            testApplication {
+                application { bumpMapApi(ObservationStore(pool), RecordingStore(pool, currentBytes + 4096), token) }
+                suspend fun archiveEmpty(id: UUID) =
+                    client.put("/v1/recordings/$id/ndjson/0?parts=1&name=bumpmap_test.ndjson") {
+                        bearerAuth(token)
+                        contentType(ContentType.Application.OctetStream)
+                        setBody(byteArrayOf())
+                    }.status
+
+                assertEquals(HttpStatusCode.NoContent, archiveEmpty(first))
+                assertEquals(HttpStatusCode.InsufficientStorage, archiveEmpty(second))
+                assertEquals(HttpStatusCode.NoContent, archiveEmpty(first))
+                assertEquals(1, completedFiles(pool, first))
+                assertEquals(0, completedFiles(pool, second))
+
+                pool.connection.use { connection ->
+                    connection.prepareStatement("DELETE FROM recording_files WHERE recording_id = ?").use { statement ->
+                        statement.setObject(1, first)
+                        statement.executeUpdate()
+                    }
+                }
+                assertEquals(HttpStatusCode.NoContent, archiveEmpty(second))
+            }
+        }
+    }
+
+    @Test
     fun storesEveryPartAndPreservesOriginalBytesAcrossRetries() {
         val token = "synthetic-token-for-local-tests-only"
         val id = UUID.randomUUID()

@@ -3,6 +3,7 @@ package com.rconegliam.bumpmap.sync
 import android.content.Context
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import androidx.work.workDataOf
 import com.rconegliam.bumpmap.recorder.RecordingStore
 import java.io.File
 import java.io.IOException
@@ -13,6 +14,8 @@ import java.util.UUID
 
 private const val API = "https://api-pilot-13fd93fa.up.railway.app"
 private const val PART_BYTES = 512 * 1024
+internal const val ARCHIVE_FULL = "recording-archive-full"
+private const val HTTP_INSUFFICIENT_STORAGE = 507
 
 internal class RecordingUploadWorker(context: Context, parameters: WorkerParameters) : Worker(context, parameters) {
     private val checkpoint = context.getSharedPreferences("recording-upload-progress", Context.MODE_PRIVATE)
@@ -27,6 +30,7 @@ internal class RecordingUploadWorker(context: Context, parameters: WorkerParamet
                 when (uploadFile(file, installationId, token)) {
                     HttpURLConnection.HTTP_NO_CONTENT -> Unit
                     HttpURLConnection.HTTP_UNAUTHORIZED, HttpURLConnection.HTTP_FORBIDDEN -> return Result.failure()
+                    HTTP_INSUFFICIENT_STORAGE -> return Result.failure(workDataOf(ARCHIVE_FULL to true))
                     HttpURLConnection.HTTP_CLIENT_TIMEOUT, 429, in 500..599 -> return Result.retry()
                     else -> hasRejectedFile = true
                 }

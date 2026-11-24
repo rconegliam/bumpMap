@@ -40,6 +40,10 @@ The archive endpoint requires the same bearer token and accepts
 part count, and zero-based part number. Parts are 512 KiB except for the last.
 An empty file is one empty part. A repeated identical part returns 204, while a
 changed part or file description returns 409.
+The archive has its own storage quota of 512 MiB by default, configurable with
+`BUMPMAP_ARCHIVE_MAX_BYTES`. The quota includes a 4 KiB allowance per part.
+HTTP 507 means new parts no longer fit. Identical retries still return 204,
+and deleting archive files in PostgreSQL releases their charges.
 
 The `completed_recording_files` view lists files with every part in PostgreSQL.
 To reconstruct a file, read the matching `recording_file_parts.contents` bytes
