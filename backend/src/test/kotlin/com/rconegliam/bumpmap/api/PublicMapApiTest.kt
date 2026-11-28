@@ -37,6 +37,15 @@ class PublicMapApiTest {
                 ),
             )
         }
+        val independentEvent = Observation(
+            type = "Feature",
+            id = UUID.randomUUID().toString(),
+            geometry = Json.decodeFromString("""{"type":"Point","coordinates":[0.1003,0.1001]}"""),
+            properties = ObservationProperties(
+                kind = "event", speedKmh = 22.0, eventType = "speed_bump", peak = 3.5,
+                recordingId = recordings[0].toString(),
+            ),
+        )
         databasePool(System.getenv()).use { pool ->
             migrate(pool)
             pool.connection.use { connection ->
@@ -91,6 +100,7 @@ class PublicMapApiTest {
                         }
                     }
                     assertEquals(HttpStatusCode.Forbidden, publish(trips[0], tokens[1]))
+                    assertEquals(HttpStatusCode.OK, publish(independentEvent, tokens[0]))
                     assertEquals(HttpStatusCode.Unauthorized, client.get("/v1/observations?bbox=0,0,1,1") {
                         bearerAuth(tokens[0])
                     }.status)
@@ -105,9 +115,11 @@ class PublicMapApiTest {
                         Json.decodeFromString<Geometry>("""{"type":"LineString","coordinates":[[0.1,0.1],[0.101,0.1]]}"""),
                         segment.geometry,
                     )
-                    assertEquals("pothole", page.features.single { it.properties.kind == "event" }.properties.eventType)
+                    val obstacles = page.features.filter { it.properties.kind == "event" }
+                    assertEquals(setOf("pothole", "speed_bump"), obstacles.map { it.properties.eventType }.toSet())
+                    assertTrue(obstacles.none { it.geometry == independentEvent.geometry })
                     assertFalse(map.bodyAsText().contains("recording_id"))
-                    assertTrue(trips.none { trip -> page.features.any { it.id == trip.id } })
+                    assertTrue((trips + independentEvent).none { trip -> page.features.any { it.id == trip.id } })
                     assertEquals(HttpStatusCode.OK, client.get("/v1/public/map/statistics?level=city").status)
                     assertEquals(HttpStatusCode.OK, client.get("/v1/public/map/route/config").status)
                 }
@@ -119,7 +131,7 @@ class PublicMapApiTest {
                             it.executeUpdate()
                         }
                     }
-                    for (trip in trips) {
+                    for (trip in trips + independentEvent) {
                         connection.prepareStatement("DELETE FROM road_observations WHERE id = ?").use {
                             it.setObject(1, UUID.fromString(trip.id))
                             it.executeUpdate()

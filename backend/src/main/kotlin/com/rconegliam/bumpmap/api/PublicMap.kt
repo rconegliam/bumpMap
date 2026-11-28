@@ -108,7 +108,11 @@ private val publicMapSql = """
     ), search_area AS (
         SELECT ST_SetSRID(ST_Expand(ST_Extent(geom), 0.001)::geometry, 4326) AS geom FROM visible
     ), measurements AS MATERIALIZED (
-        SELECT ST_LineInterpolatePoint(observation.geometry, 0.5) AS midpoint,
+        SELECT CASE ST_GeometryType(observation.geometry)
+                   WHEN 'ST_LineString' THEN ST_LineInterpolatePoint(observation.geometry, 0.5)
+                   WHEN 'ST_Point' THEN observation.geometry
+               END AS position,
+               props->>'type' AS event_type,
                LEAST((props->>'speed_kmh')::double precision, 300) AS speed,
                (props->>'roughness')::double precision AS roughness,
                (props->>'score')::integer AS score,
@@ -117,10 +121,11 @@ private val publicMapSql = """
         FROM road_observations observation CROSS JOIN search_area
         CROSS JOIN LATERAL (SELECT observation.feature->'properties' AS props) input
         WHERE observation.geometry && search_area.geom
-          AND ST_GeometryType(observation.geometry) = 'ST_LineString'
-          AND props->>'kind' = 'segment' AND props->>'recording_id' IS NOT NULL
-          AND props->>'potholes' IS NOT NULL AND props->>'speed_bumps' IS NOT NULL
-          AND (props->>'roughness' IS NOT NULL OR props->>'score' IS NOT NULL)
+          AND props->>'recording_id' IS NOT NULL
+          AND ((props->>'kind' = 'segment' AND props->>'potholes' IS NOT NULL
+                  AND props->>'speed_bumps' IS NOT NULL
+                  AND (props->>'roughness' IS NOT NULL OR props->>'score' IS NOT NULL))
+               OR props->>'kind' = 'event')
     ), matched AS (
         SELECT way.id, measurements.*,
                CASE WHEN roughness IS NULL THEN score ELSE
@@ -129,8 +134,8 @@ private val publicMapSql = """
         FROM measurements
         JOIN LATERAL (
             SELECT way.id FROM map_street_ways way
-            WHERE ST_DWithin(way.geom::geography, midpoint::geography, 35)
-            ORDER BY ST_Distance(way.geom::geography, midpoint::geography), way.id COLLATE "C"
+            WHERE ST_DWithin(way.geom::geography, position::geography, 35)
+            ORDER BY ST_Distance(way.geom::geography, position::geography), way.id COLLATE "C"
             LIMIT 1
         ) way ON true
     ), scored AS (
@@ -139,9 +144,11 @@ private val publicMapSql = """
         FROM matched
     ), grouped AS (
         SELECT scored.id,
-               AVG(speed) AS speed,
+               COALESCE(AVG(speed) FILTER (WHERE event_type IS NULL), AVG(speed)) AS speed,
                LEAST(SUM(potholes), 2147483647)::integer AS potholes,
                LEAST(SUM(speed_bumps), 2147483647)::integer AS speed_bumps,
+               BOOL_OR(event_type = 'pothole') AS mapped_pothole,
+               BOOL_OR(event_type = 'speed_bump') AS mapped_speed_bump,
                ROUND(AVG(${roundPositive("base_penalty")} + potholes * 20::bigint + speed_bumps * 12::bigint))::bigint AS penalty
         FROM scored JOIN visible ON visible.id = scored.id
         GROUP BY scored.id
@@ -151,11 +158,13 @@ private val publicMapSql = """
                grouped.speed_bumps, grouped.penalty
         FROM grouped JOIN visible USING (id)
         CROSS JOIN LATERAL (
-            SELECT 'segment' AS kind, NULL::text AS event_type, visible.geom
+            SELECT 'segment' AS kind, NULL::text AS event_type, visible.geom WHERE grouped.penalty IS NOT NULL
             UNION ALL
-            SELECT 'event', 'pothole', ST_LineInterpolatePoint(visible.geom, 0.45) WHERE grouped.potholes > 0
+            SELECT 'event', 'pothole', ST_LineInterpolatePoint(visible.geom, 0.45)
+            WHERE grouped.potholes > 0 OR grouped.mapped_pothole
             UNION ALL
-            SELECT 'event', 'speed_bump', ST_LineInterpolatePoint(visible.geom, 0.55) WHERE grouped.speed_bumps > 0
+            SELECT 'event', 'speed_bump', ST_LineInterpolatePoint(visible.geom, 0.55)
+            WHERE grouped.speed_bumps > 0 OR grouped.mapped_speed_bump
         ) layer
     )
     SELECT id, kind, event_type, ST_AsGeoJSON(features.geom) AS geometry, speed, potholes, speed_bumps, penalty
