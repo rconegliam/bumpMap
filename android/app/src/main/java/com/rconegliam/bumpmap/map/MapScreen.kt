@@ -42,6 +42,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rconegliam.bumpmap.R
 import com.rconegliam.bumpmap.detection.EventType
 import com.rconegliam.bumpmap.detection.Geo
+import com.rconegliam.bumpmap.detection.MAP_QUALITY
 import com.rconegliam.bumpmap.detection.MEAN_SPEED
 import com.rconegliam.bumpmap.detection.POTHOLE_COUNT
 import com.rconegliam.bumpmap.detection.SPEED_BUMP_COUNT
@@ -77,7 +78,6 @@ private const val DETECTIONS_SOURCE = "bumpmap-detections"
 private const val SEGMENTS_LAYER = "bumpmap-segments"
 private const val EVENTS_LAYER = "bumpmap-events"
 private const val SPEED_LAYER = "bumpmap-speeds"
-private const val MAP_QUALITY = "map_quality"
 
 // Between Barueri and São Paulo, the beta cities.
 private val START_POSITION = CameraPosition.Builder()
@@ -103,7 +103,6 @@ fun MapScreen(modifier: Modifier = Modifier) {
     var pilotViewport by remember { mutableStateOf<PilotViewport?>(null) }
     var unavailable by remember { mutableStateOf(false) }
     var viewport by remember { mutableStateOf<String?>(null) }
-    val token = RecordingSync.token(context)
     var filter by rememberSaveable { mutableStateOf(MapFilter.ALL) }
     var showSpeed by rememberSaveable { mutableStateOf(false) }
     var selection by remember { mutableStateOf<RoadMapMetrics?>(null) }
@@ -115,14 +114,14 @@ fun MapScreen(modifier: Modifier = Modifier) {
     }
 
     // The server is the only source of road observations; nothing is read from local recordings.
-    LaunchedEffect(token, viewport, publishedVersion) {
+    LaunchedEffect(viewport, publishedVersion) {
         val bbox = viewport
-        if (token == null || bbox == null) {
+        if (bbox == null) {
             pilotViewport = null
             unavailable = false
             return@LaunchedEffect
         }
-        val result = withContext(Dispatchers.IO) { runCatching { PilotMapApi.readViewport(bbox, token) } }
+        val result = withContext(Dispatchers.IO) { runCatching { PilotMapApi.readViewport(bbox) } }
         if (result.isFailure && result.exceptionOrNull() is CancellationException) return@LaunchedEffect
         unavailable = result.isFailure
         pilotViewport = result.getOrNull()
@@ -169,7 +168,6 @@ fun MapScreen(modifier: Modifier = Modifier) {
             },
         )
         val notice = when {
-            token == null -> R.string.map_needs_token
             unavailable -> R.string.map_unavailable
             features.isEmpty() -> R.string.map_no_data
             else -> null
