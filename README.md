@@ -4,7 +4,7 @@ Crowdsourced map of road quality for Brazil. While you drive, the Android app me
 
 - Android app: Kotlin + Jetpack Compose, MapLibre + OpenStreetMap
 - Languages: Brazilian Portuguese and English
-- Backend: Kotlin/Ktor and PostGIS for the Railway pilot. Valhalla map matching and Martin vector tiles are planned.
+- Backend and web map: Kotlin/Ktor, PostgreSQL with PostGIS, and MapLibre GL JS on Railway
 - Beta cities: Barueri and São Paulo
 
 See [docs/PLAN.md](docs/PLAN.md) for the full plan.
@@ -20,11 +20,13 @@ cd android
 ```
 
 Current features:
-- Map (MapLibre + OpenFreeMap / OpenStreetMap) centered on Barueri and São Paulo, labels in the app language
-- Drive recorder: motion sensors + GPS saved to CSV, with buttons to mark speed bumps, potholes and rough pavement, and share the file. See [docs/recording-format.md](docs/recording-format.md)
-- Optional pilot sync for saved and future recordings, including the original CSV and NDJSON detections
+- Shared road map centered on Barueri and São Paulo, with obstacle filters and average speed
+- Drive recording with GPS, motion sensors, automatic detections and manual marks. See [docs/recording-format.md](docs/recording-format.md)
+- Central storage for original CSV recordings, NDJSON detections and shared observations. The phone queues pending uploads and removes files after confirmation.
 - English and Brazilian Portuguese, with an in-app language picker
 
-## Backend pilot
+## Web map and Railway pilot
 
-See [backend/README.md](backend/README.md) for recording sync setup, the observation API, and Railway deployment.
+The web map is served at the root of the Railway API URL and uses a dedicated read-only pilot code. Android and the website consult the same PostgreSQL database.
+
+See [backend/README.md](backend/README.md) for pilot setup, API configuration, and deployment.
