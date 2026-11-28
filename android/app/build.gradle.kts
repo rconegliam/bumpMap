@@ -15,6 +15,9 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         resourceConfigurations += listOf("en", "pt-rBR")
+        val apiBaseUrl = providers.gradleProperty("bumpmap.apiBaseUrl")
+            .getOrElse("https://api-pilot-13fd93fa.up.railway.app")
+        buildConfigField("String", "API_BASE_URL", "\"$apiBaseUrl\"")
     }
 
     buildTypes {
