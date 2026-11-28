@@ -45,7 +45,7 @@ map rating.
 
 ## Central storage
 
-The recorder requires a configured pilot connection. Android queues the original
+The recorder works offline. Android registers the installation on its first upload and queues the original
 CSV and NDJSON files until they can be archived in PostgreSQL and the measured
 segments and events can be published to the shared map. An interrupted upload can
 resume from the last acknowledged part. Pending files stay available to the uploader

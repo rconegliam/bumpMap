@@ -20,19 +20,22 @@ private val MapStatisticsHeaders = createRouteScopedPlugin("MapStatisticsHeaders
     }
 }
 
-internal fun Route.mapStatisticsRoutes(store: ObservationStore) {
-    route("/v1/map/statistics") {
+internal fun Route.mapStatisticsRoutes(store: ObservationStore, publicReads: PublicReads? = null) {
+    route(if (publicReads == null) "/v1/map/statistics" else "/v1/public/map/statistics") {
         install(MapStatisticsHeaders)
-        authenticate("map-read") {
+        val endpoints: Route.() -> Unit = {
             get {
                 val query = MapStatisticsQuery.parse(call.request.queryParameters)
                 if (query == null) {
                     call.respond(HttpStatusCode.BadRequest, ApiError("invalid_statistics_query"))
                     return@get
                 }
-                call.respond(withContext(Dispatchers.IO) { store.mapStatistics(query) })
+                if (publicReads != null) {
+                    publicReads.respond(call) { store.mapStatistics(query) }
+                } else call.respond(withContext(Dispatchers.IO) { store.mapStatistics(query) })
             }
         }
+        if (publicReads == null) authenticate("map-read", build = endpoints) else endpoints()
     }
 }
 

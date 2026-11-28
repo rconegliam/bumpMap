@@ -62,10 +62,10 @@ private val RoutingHeaders = createRouteScopedPlugin("RoutingHeaders") {
  * 502 = invalid or failed upstream response, 503 = provider disabled/unavailable, 504 = upstream timeout.
  * GET /v1/map/route/config uses the same bearer and indicates whether a provider is enabled and external.
  */
-internal fun Route.routingRoutes(provider: OsrmRoutingProvider?) {
-    route("/v1/map/route") {
+internal fun Route.routingRoutes(provider: OsrmRoutingProvider?, public: Boolean = false) {
+    route(if (public) "/v1/public/map/route" else "/v1/map/route") {
         install(RoutingHeaders)
-        authenticate("map-read") {
+        val endpoints: Route.() -> Unit = {
             get("/config") {
                 call.respond(RoutingConfig(provider != null, provider?.external == true))
             }
@@ -90,6 +90,7 @@ internal fun Route.routingRoutes(provider: OsrmRoutingProvider?) {
                 }
             }
         }
+        if (public) endpoints() else authenticate("map-read", build = endpoints)
     }
 }
 

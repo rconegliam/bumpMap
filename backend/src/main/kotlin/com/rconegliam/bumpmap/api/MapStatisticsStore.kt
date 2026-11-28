@@ -82,7 +82,7 @@ private fun statisticsSql(query: MapStatisticsQuery): String {
         WITH matched AS (
             SELECT area.id AS area_id, $streetName AS street_name,
                    ST_Length(observation.geometry::geography) AS length_metres,
-                   (props.value->>'speed_kmh')::double precision AS speed_kmh,
+                   LEAST((props.value->>'speed_kmh')::double precision, 300) AS speed_kmh,
                    (props.value->>'roughness')::double precision AS roughness,
                    (props.value->>'score')::integer AS score,
                    (props.value->>'potholes')::integer AS potholes,
@@ -141,7 +141,7 @@ private fun statisticsSql(query: MapStatisticsQuery): String {
 }
 
 // Match Kotlin's roundToInt for nonnegative scores, including ties, without rounding the fraction first.
-private fun roundPositive(value: String): String = "(FLOOR($value)::int + ($value - FLOOR($value) >= 0.5)::int)"
+internal fun roundPositive(value: String): String = "(FLOOR($value)::int + ($value - FLOOR($value) >= 0.5)::int)"
 
 // ST_DWithin can use a GiST index on geom::geography. Use exact metres to select one of the nearby ways.
 private val STREET_MATCH = """

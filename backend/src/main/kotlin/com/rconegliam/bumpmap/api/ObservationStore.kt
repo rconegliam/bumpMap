@@ -9,6 +9,8 @@ internal class ObservationStore(private val database: DataSource) {
 
     fun mapStatistics(query: MapStatisticsQuery): MapStatisticsPage = database.readMapStatistics(query)
 
+    fun publicMap(box: BoundingBox, after: UUID?): MapObservationPage = database.readPublicMap(box, after)
+
     fun save(features: List<Observation>): Boolean {
         val json = Json.encodeToString(features)
         return database.connection.use { connection ->

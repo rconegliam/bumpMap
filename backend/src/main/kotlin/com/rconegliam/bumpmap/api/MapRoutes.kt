@@ -19,7 +19,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-private val MapReadHeaders = createRouteScopedPlugin("MapReadHeaders") {
+internal val MapReadHeaders = createRouteScopedPlugin("MapReadHeaders") {
     onCall { call ->
         call.response.header(HttpHeaders.CacheControl, "no-store")
         call.response.header("X-Content-Type-Options", "nosniff")
@@ -50,14 +50,14 @@ internal fun Route.mapRoutes(store: ObservationStore) {
 }
 
 @Serializable
-private data class MapObservationPage(
+internal data class MapObservationPage(
     val type: String,
     val features: List<MapObservation>,
     @SerialName("next_cursor") val nextCursor: String? = null,
 )
 
 @Serializable
-private data class MapObservation(
+internal data class MapObservation(
     val type: String,
     val id: String,
     val geometry: Geometry,
@@ -65,7 +65,7 @@ private data class MapObservation(
 )
 
 @Serializable
-private data class MapProperties(
+internal data class MapProperties(
     val kind: String,
     @SerialName("speed_kmh") val speedKmh: Double,
     val quality: String? = null,

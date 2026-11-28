@@ -1,21 +1,23 @@
 # BumpMap API pilot
 
 This Ktor service stores road observations and Android recording archives
-in PostgreSQL with PostGIS. Keep the pilot token on trusted test clients.
+in PostgreSQL with PostGIS. The website and current Android client read the public map without credentials.
 
 | Method | Path | Result |
 | --- | --- | --- |
 | GET | `/`, `/assets/…` | Serves the public website shell and assets bundled under `src/main/resources/web` |
 | GET | `/health` | 200 when the API can reach PostgreSQL, otherwise 503 |
+| POST | `/v1/installations` | Registers an Android installation and returns 204 |
 | POST | `/v1/observations` | Accepts a GeoJSON FeatureCollection with 1 to 100 observations and returns the accepted count |
 | GET | `/v1/observations?bbox=west,south,east,north` | Returns up to 500 intersecting features in a GeoJSON FeatureCollection |
-| GET | `/v1/map/observations?bbox=west,south,east,north` | Returns up to 500 intersecting recording-derived features for the pilot website |
-| GET | `/v1/map/statistics?level=city&sort=coverage&limit=20&offset=0` | Returns statistics or ranked results for measured cities, states, countries or streets |
-| GET | `/v1/map/route?from=lon,lat&to=lon,lat` | Calculates a car route between two points in the pilot area |
-| GET | `/v1/map/route/config` | Reports whether routing is enabled and whether the provider is external |
+| GET | `/v1/public/map/observations?bbox=west,south,east,north` | Returns up to 500 aggregated road and obstacle features |
+| GET | `/v1/public/map/statistics?level=city&sort=coverage&limit=20&offset=0` | Returns statistics or ranked results for measured cities, states, countries or streets |
+| GET | `/v1/public/map/route?from=lon,lat&to=lon,lat` | Calculates a car route between two points in the pilot area |
+| GET | `/v1/public/map/route/config` | Reports whether routing is enabled and whether the provider is external |
 | PUT | `/v1/recordings/{id}/{kind}/{number}?parts=…&name=…` | Saves one part of an original recording file and returns 204 |
 
-The legacy `/v1/observations` routes require `Authorization: Bearer <BUMPMAP_API_TOKEN>`.
+Read access to `/v1/observations` requires the legacy operator credential `BUMPMAP_API_TOKEN`.
+Writes accept the registered installation credential scoped to the recording, or the legacy credential.
 Use `Content-Type: application/json` or `application/geo+json` to submit observations.
 Send `Accept: application/geo+json` to request that media type when reading them.
 Upload acknowledgments and errors are returned as `application/json`.
@@ -32,24 +34,25 @@ coordinates and no trip metadata.
 
 ## Pilot map
 
-The website shell is public; exact observation locations are not public data.
-All `/v1/map` endpoints require `Authorization: Bearer <BUMPMAP_MAP_READ_TOKEN>`.
-The map token does not work on the archive or legacy observation routes, and
-the API token does not work on the map endpoint. Give the map token only to
-authorized pilot users; never embed it in bundled website resources or put it
-in a URL. If the map token is unset or blank, the endpoint rejects access.
+The site and current Android app use `/v1/public/map` without a read token.
+The map uses the geometry of the nearest road in the pilot OpenStreetMap snapshot
+when the segment midpoint is within 35 metres. It averages speed and penalty
+and totals obstacles across passages on each road way. Obstacle markers represent
+the approximate location on the way. Segments outside the road snapshot or
+without a match can still count in administrative statistics.
 
-The map endpoint returns an `application/geo+json` FeatureCollection with the
+The public map endpoint returns an `application/geo+json` FeatureCollection with the
 same bounding box and `after` pagination rules as the legacy endpoint.
 `next_cursor` is present only when there is another page.
 Features have `type`, `id`, `geometry`, and `properties` without
-`recording_id`. Each feature's properties include `kind` and `speed_kmh`.
-Scored segments have `quality`, `score`, `roughness` (when available), `potholes`,
+`recording_id`. Each feature's properties include `kind` and the way's mean `speed_kmh`.
+Scored segments have `potholes`,
 `speed_bumps`, `map_quality` (`good`, `fair`, `poor`, or `bad`), and
-`penalty_points` (integer). Events have `type` and `peak` instead.
+`penalty_points` (integer). Obstacle markers have `type`.
 Map penalties use the current Android pavement calibration from `roughness`
 (0.6 to 2.5), falling back to the stored `score` when roughness is absent.
-The returned `score` and `quality` are unchanged from the stored observation.
+The legacy `/v1/map` endpoints remain available with `BUMPMAP_MAP_READ_TOKEN`
+for authenticated pilot clients.
 
 ### Statistics and rankings
 
@@ -79,13 +82,17 @@ and live traffic are outside this estimate.
 
 ## Recording archives
 
-In Android **Settings → Server sync**, save `BUMPMAP_API_TOKEN` from the Railway
-API service before recording. Android queues finished recordings already on the
-phone and future recordings. WorkManager uses an unmetered connection by default,
+Android queues finished recordings already on the phone and future recordings.
+On the first upload it registers its installation UUID and a locally generated
+random credential. The API stores the credential digest and accepts retrying
+the same registration. Enrollment is anonymous and the API limits new
+registrations and the daily upload volume per installation.
+WorkManager uses an unmetered connection by default,
 resumes interrupted uploads and removes files after the archive and map uploads
 are confirmed. The archive includes the original GPS routes and sensor data.
 
-The archive endpoint requires the same bearer token and accepts
+The archive endpoint requires the installation bearer credential or legacy
+`BUMPMAP_API_TOKEN` and accepts
 `application/octet-stream`. The recording ID is a stable UUID shared by its
 `csv` and `ndjson` files. Each request includes an original file name, total
 part count, and zero-based part number. Parts are 512 KiB except for the last.
@@ -104,8 +111,8 @@ route. Its NDJSON files are separate from the shared road-observation endpoint.
 
 After archiving a recording, Android publishes its measured sections and events
 to the observation API. Sections include the mean measured speed in km/h and
-separate pothole and speed bump counts. The Android map requests these
-observations with `from_recordings=true`.
+separate pothole and speed bump counts. Installation credentials can publish
+observations only for recordings with an uploaded NDJSON file.
 
 ## Local verification
 

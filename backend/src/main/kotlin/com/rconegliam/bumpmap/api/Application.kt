@@ -13,6 +13,7 @@ import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.bearer
+import io.ktor.server.auth.principal
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.BadRequestException
@@ -54,7 +55,7 @@ fun main() {
         embeddedServer(Netty, host = "0.0.0.0", port = env["PORT"]?.toInt() ?: 8080) {
             bumpMapApi(
                 ObservationStore(pool), RecordingStore(pool, archiveLimit), token,
-                env["BUMPMAP_MAP_READ_TOKEN"], routingProvider,
+                env["BUMPMAP_MAP_READ_TOKEN"], routingProvider, InstallationStore(pool),
             )
         }.start(wait = true)
     }
@@ -66,6 +67,7 @@ internal fun Application.bumpMapApi(
     token: String,
     mapReadToken: String? = null,
     routingProvider: OsrmRoutingProvider? = null,
+    installations: InstallationStore? = null,
 ) {
     val tokenBytes = token.toByteArray()
     val mapReadDigest = mapReadToken?.takeUnless(String::isBlank)?.let(::mapTokenDigest)
@@ -82,6 +84,14 @@ internal fun Application.bumpMapApi(
             authenticate { credential ->
                 if (MessageDigest.isEqual(tokenBytes, credential.token.toByteArray())) UserIdPrincipal("pilot")
                 else null
+            }
+        }
+        bearer("write") {
+            authenticate { credential ->
+                if (MessageDigest.isEqual(tokenBytes, credential.token.toByteArray())) UserIdPrincipal("pilot")
+                else withContext(Dispatchers.IO) {
+                    installations?.installationId(credential.token)?.let { UserIdPrincipal(it.toString()) }
+                }
             }
         }
         bearer("map-read") {
@@ -114,6 +124,11 @@ internal fun Application.bumpMapApi(
         mapRoutes(store)
         mapStatisticsRoutes(store)
         routingRoutes(routingProvider)
+        val publicReads = PublicReads()
+        publicMapRoutes(store, publicReads)
+        mapStatisticsRoutes(store, publicReads)
+        routingRoutes(routingProvider, public = true)
+        installations?.let(::installationRoutes)
         get("/health") {
             call.response.header(HttpHeaders.CacheControl, "no-store")
             if (withContext(Dispatchers.IO) { store.ready() }) {
@@ -122,7 +137,7 @@ internal fun Application.bumpMapApi(
                 call.respond(HttpStatusCode.ServiceUnavailable, ApiError("database_unavailable"))
             }
         }
-        authenticate {
+        authenticate("write") {
             route("/v1/recordings/{id}/{kind}/{number}") {
                 install(RequestBodyLimit) { bodyLimit { RECORDING_PART_BYTES.toLong() } }
                 put {
@@ -146,11 +161,23 @@ internal fun Application.bumpMapApi(
                         call.respond(HttpStatusCode.BadRequest, ApiError("invalid_recording_part"))
                         return@put
                     }
+                    val installationId = call.principal<UserIdPrincipal>()?.name?.let(::parseId)
+                    if (installationId != null && !checkNotNull(installations).ownsRecording(installationId, id, part.fileName)) {
+                        call.respond(HttpStatusCode.Forbidden, ApiError("recording_not_owned"))
+                        return@put
+                    }
                     val bytes = call.receive<ByteArray>()
                     if (!part.validSize(bytes.size)) {
                         call.respond(HttpStatusCode.BadRequest, ApiError("invalid_recording_part_size"))
                     } else {
-                        when (withContext(Dispatchers.IO) { recordings.save(part, bytes) }) {
+                        val result = withContext(Dispatchers.IO) {
+                            if (installationId != null && !checkNotNull(installations).allowsWrite(installationId, bytes.size)) {
+                                return@withContext null
+                            }
+                            recordings.save(part, bytes)
+                        }
+                        when (result) {
+                            null -> call.respond(HttpStatusCode.TooManyRequests, ApiError("installation_upload_limit"))
                             RecordingSaveResult.STORED -> call.respond(HttpStatusCode.NoContent)
                             RecordingSaveResult.CONFLICT ->
                                 call.respond(HttpStatusCode.Conflict, ApiError("recording_part_conflict"))
@@ -162,20 +189,24 @@ internal fun Application.bumpMapApi(
                     }
                 }
             }
+        }
+        authenticate {
+            get("/v1/observations") {
+                call.response.header(HttpHeaders.CacheControl, "no-store")
+                val box = BoundingBox.parse(call.request.queryParameters["bbox"])
+                val rawCursor = call.request.queryParameters["after"]
+                val after = rawCursor?.let(::parseId)
+                val fromRecordings = call.request.queryParameters["from_recordings"] == "true"
+                if (box == null || (rawCursor != null && after == null)) {
+                    call.respond(HttpStatusCode.BadRequest, ApiError("invalid_bbox_or_cursor"))
+                    return@get
+                }
+                call.respond(withContext(Dispatchers.IO) { store.lookup(box, after, fromRecordings) })
+            }
+        }
+        authenticate("write") {
             route("/v1/observations") {
                 install(RequestBodyLimit) { bodyLimit { MAX_BODY_BYTES } }
-                get {
-                    call.response.header(HttpHeaders.CacheControl, "no-store")
-                    val box = BoundingBox.parse(call.request.queryParameters["bbox"])
-                    val rawCursor = call.request.queryParameters["after"]
-                    val after = rawCursor?.let(::parseId)
-                    val fromRecordings = call.request.queryParameters["from_recordings"] == "true"
-                    if (box == null || (rawCursor != null && after == null)) {
-                        call.respond(HttpStatusCode.BadRequest, ApiError("invalid_bbox_or_cursor"))
-                        return@get
-                    }
-                    call.respond(withContext(Dispatchers.IO) { store.lookup(box, after, fromRecordings) })
-                }
                 post {
                     call.response.header(HttpHeaders.CacheControl, "no-store")
                     val contentType = call.request.contentType()
@@ -190,6 +221,23 @@ internal fun Application.bumpMapApi(
                     ) {
                         call.respond(HttpStatusCode.BadRequest, ApiError("invalid_observations"))
                         return@post
+                    }
+                    val installationId = call.principal<UserIdPrincipal>()?.name?.let(::parseId)
+                    if (installationId != null) {
+                        val installationStore = checkNotNull(installations)
+                        val recordingId = batch.features.map { it.properties.recordingId }.distinct()
+                            .singleOrNull()?.let(::parseId)
+                        val owns = recordingId != null && withContext(Dispatchers.IO) {
+                            installationStore.ownsCompletedDetections(installationId, recordingId)
+                        }
+                        if (!owns) {
+                            call.respond(HttpStatusCode.Forbidden, ApiError("recording_not_owned"))
+                            return@post
+                        }
+                        if (!withContext(Dispatchers.IO) { installationStore.allowsWrite(installationId) }) {
+                            call.respond(HttpStatusCode.TooManyRequests, ApiError("installation_upload_limit"))
+                            return@post
+                        }
                     }
                     if (withContext(Dispatchers.IO) { store.save(batch.features) }) {
                         call.respond(AcceptedObservations(batch.features.size))

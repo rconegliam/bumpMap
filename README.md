@@ -27,7 +27,7 @@ Current features:
 
 ## Web map and Railway pilot
 
-The web map is served at the root of the Railway API URL and uses a dedicated read-only pilot code. Android and the website consult the same PostgreSQL database.
+The [BumpMap website](https://bumpapp.coneglis.com) and the Android map load shared road measurements automatically from the same Railway PostgreSQL database. Android registers each installation in the background and uploads finished recordings when a permitted connection is available.
 
 The website provides map filters, car routes in the pilot area, city/state/country statistics, and rankings by street, city, state and country.
 
