@@ -38,12 +38,25 @@ internal data class RoadMapMetrics(
                 ?.takeIf { it.isFinite() && it >= 0 } ?: return null
             return RoadMapMetrics(
                 meanSpeedKmh = speed,
-                pavementScore = feature.getNumberProperty("score")?.toInt() ?: return null,
+                pavementScore = mapPavementScore(feature) ?: return null,
                 potholes = feature.getNumberProperty(POTHOLE_COUNT)?.toInt() ?: return null,
                 speedBumps = feature.getNumberProperty(SPEED_BUMP_COUNT)?.toInt() ?: return null,
             )
         }
     }
+}
+
+private const val NORMAL_SHAKE_ROUGHNESS = 0.6
+private const val WORST_MAP_ROUGHNESS = 2.5
+
+private fun mapPavementScore(feature: Feature): Int? {
+    val roughness = feature.properties()?.get("roughness")
+        ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isNumber }?.asDouble
+        ?.takeIf { it.isFinite() && it >= 0 }
+        ?: return feature.getNumberProperty("score")?.toInt()
+    val fraction = ((roughness - NORMAL_SHAKE_ROUGHNESS) / (WORST_MAP_ROUGHNESS - NORMAL_SHAKE_ROUGHNESS))
+        .coerceIn(0.0, 1.0)
+    return (100 * (1 - fraction)).roundToInt()
 }
 
 private const val NEARBY_SEGMENTS = 8

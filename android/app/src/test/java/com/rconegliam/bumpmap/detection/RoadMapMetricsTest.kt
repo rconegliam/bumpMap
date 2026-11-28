@@ -4,6 +4,8 @@ import java.util.UUID
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.maplibre.geojson.Feature
+import kotlin.math.sqrt
 
 class RoadMapMetricsTest {
     @Test
@@ -59,6 +61,65 @@ class RoadMapMetricsTest {
         assertTrue(hole.penaltyPoints < holes.penaltyPoints)
         assertEquals(RoadQuality.GOOD, best.quality)
         assertEquals(RoadQuality.BAD, holes.quality)
+    }
+
+    @Test
+    fun archivedRoughnessDistinguishesNormalShakeFromRoughPavement() {
+        val roughness = listOf(0.59, 0.60, 0.61, 0.78, 0.79, 1.60, 1.69, 1.70, 2.50)
+        val metrics = roughness.map { checkNotNull(RoadMapMetrics.from(archivedSegment(it))) }
+
+        assertEquals(listOf(100, 100, 99, 91, 90, 47, 43, 42, 0), metrics.map { it.pavementScore })
+        assertEquals(listOf(5L, 5L, 5L, 7L, 8L, 18L, 19L, 20L, 30L), metrics.map { it.penaltyPoints })
+        assertEquals(
+            List(4) { RoadQuality.GOOD } + List(3) { RoadQuality.FAIR } + List(2) { RoadQuality.POOR },
+            metrics.map { it.quality },
+        )
+    }
+
+    @Test
+    fun mapReadCalibratesWithoutChangingPublishedPropertiesAndFallsBackToLegacyScore() {
+        val feature = archivedSegment(1.60)
+        val publication = feature.toJson()
+        assertEquals(41, feature.getNumberProperty("score").toInt())
+        assertEquals(RoadQuality.BAD.code, feature.getStringProperty("quality"))
+        assertEquals(RoadQuality.FAIR, RoadMapMetrics.from(feature)?.quality)
+        assertEquals(publication, feature.toJson())
+
+        feature.removeProperty("roughness")
+        assertEquals(RoadQuality.POOR, RoadMapMetrics.from(feature)?.quality)
+        feature.addNumberProperty("roughness", -1.0)
+        assertEquals(RoadQuality.POOR, RoadMapMetrics.from(feature)?.quality)
+    }
+
+    @Test
+    fun calibratedMapRatingStillAccountsForEachObstacleAndRewardsSmoothSpeed() {
+        val smooth = archivedSegment(0.60)
+        val slow = checkNotNull(RoadMapMetrics.from(smooth))
+        smooth.addNumberProperty(MEAN_SPEED, 60.0)
+        val fast = checkNotNull(RoadMapMetrics.from(smooth))
+        assertEquals(5L, slow.penaltyPoints - fast.penaltyPoints)
+
+        val rough = archivedSegment(2.0)
+        val baseline = checkNotNull(RoadMapMetrics.from(rough))
+        rough.addNumberProperty(POTHOLE_COUNT, 1)
+        val pothole = checkNotNull(RoadMapMetrics.from(rough))
+        rough.addNumberProperty(SPEED_BUMP_COUNT, 2)
+        val obstacles = checkNotNull(RoadMapMetrics.from(rough))
+        assertEquals(20L, pothole.penaltyPoints - baseline.penaltyPoints)
+        assertEquals(24L, obstacles.penaltyPoints - pothole.penaltyPoints)
+        assertEquals(RoadQuality.POOR, baseline.quality)
+        assertEquals(RoadQuality.BAD, pothole.quality)
+    }
+
+    private fun archivedSegment(roughness: Double): Feature {
+        val start = GeoPoint(-23.53, -46.76)
+        val end = start.copy(lon = -46.7597)
+        val analyzer = RoadAnalyzer(onSegment = {}, onEvent = {})
+        val line = GeoJson.feature(RoadSegment(
+            listOf(start, end), 30.0, 30.0 / 3.6, roughness * sqrt(30.0 / 40.0),
+            roughness, analyzer.score(roughness), analyzer.quality(roughness),
+        ))
+        return mapFeatures(sequenceOf(line), UUID.randomUUID()).single()
     }
 
     private fun segment(start: GeoPoint, end: GeoPoint, speedKmh: Double, startNs: Long? = null, endNs: Long? = null) =
