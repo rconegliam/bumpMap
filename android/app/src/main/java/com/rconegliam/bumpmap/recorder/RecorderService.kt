@@ -147,7 +147,7 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
     @SuppressLint("MissingPermission")
     private fun startRecording() {
         if (recording) return
-        if (!hasLocationPermission(this) || !RecordingSync.hasToken(this)) {
+        if (!hasLocationPermission(this)) {
             stopSelf()
             return
         }

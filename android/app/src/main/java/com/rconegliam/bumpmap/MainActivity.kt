@@ -12,6 +12,7 @@ import com.rconegliam.bumpmap.ui.BumpMapTheme
 class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        RecordingSync.clearLegacyToken(this)
         RecordingSync.enqueue(this, ExistingWorkPolicy.KEEP)
         setContent {
             BumpMapTheme {

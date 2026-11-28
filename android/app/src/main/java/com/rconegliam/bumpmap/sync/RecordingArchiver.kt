@@ -16,6 +16,7 @@ private const val HTTP_TOO_MANY_REQUESTS = 429
 private const val HTTP_CANCELLED = HttpURLConnection.HTTP_CLIENT_TIMEOUT
 
 internal interface ArchiveApi {
+    fun registerInstallation(installationId: String): Int
     fun putPart(id: UUID, kind: String, number: Int, parts: Int, name: String, bytes: ByteArray): Int
     fun publish(features: List<Feature>): Int
 }
@@ -44,9 +45,27 @@ internal class RecordingArchiver(
     private val onPublished: () -> Unit = {},
 ) {
     fun run(files: List<File>): ArchiveOutcome {
+        val grouped = files
+            .filter { it.exists() && (it.extension == "csv" || it.extension == "ndjson") }
+            .groupBy { it.nameWithoutExtension }
+            .toSortedMap()
+        if (grouped.isEmpty()) return ArchiveOutcome.SUCCESS
+        if (isCancelled()) return ArchiveOutcome.RETRY
+        val registrationStatus = try {
+            api.registerInstallation(installationId)
+        } catch (_: IOException) {
+            return ArchiveOutcome.RETRY
+        }
+        when (registrationStatus) {
+            HttpURLConnection.HTTP_NO_CONTENT -> Unit
+            HttpURLConnection.HTTP_UNAUTHORIZED, HttpURLConnection.HTTP_FORBIDDEN, HttpURLConnection.HTTP_CONFLICT ->
+                return ArchiveOutcome.UNAUTHORIZED
+            HTTP_CANCELLED, HTTP_TOO_MANY_REQUESTS, in 500..599 -> return ArchiveOutcome.RETRY
+            else -> return ArchiveOutcome.REJECTED
+        }
         var archiveFull = false
         var rejected = false
-        for ((baseName, recordingFiles) in files.groupBy { it.nameWithoutExtension }.toSortedMap()) {
+        for ((baseName, recordingFiles) in grouped) {
             if (isCancelled()) return ArchiveOutcome.RETRY
             val status = try {
                 archive(baseName, recordingFiles.sortedBy { it.extension })

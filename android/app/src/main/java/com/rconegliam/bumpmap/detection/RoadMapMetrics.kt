@@ -11,39 +11,83 @@ import org.maplibre.geojson.Point
 internal const val POTHOLE_COUNT = "potholes"
 internal const val SPEED_BUMP_COUNT = "speed_bumps"
 internal const val MEAN_SPEED = "speed_kmh"
+internal const val MAP_QUALITY = "map_quality"
+internal const val PENALTY_POINTS = "penalty_points"
 
 internal data class RoadMapMetrics(
     val meanSpeedKmh: Double,
-    val pavementScore: Int,
+    val pavementScore: Int?,
     val potholes: Int,
     val speedBumps: Int,
+    private val serverPenaltyPoints: Long? = null,
+    private val serverQuality: RoadQuality? = null,
 ) {
     val penaltyPoints: Long
-        get() = ((100 - pavementScore.coerceIn(0, 100)) * 0.25 +
-            (1.0 - meanSpeedKmh.coerceIn(0.0, 60.0) / 60.0) * 10).roundToInt() +
-            potholes * 20L + speedBumps * 12L
+        get() = serverPenaltyPoints ?: computePenaltyPoints(
+            pavementScore = pavementScore ?: 0,
+            meanSpeedKmh = meanSpeedKmh,
+            potholes = potholes,
+            speedBumps = speedBumps,
+        )
 
     val quality: RoadQuality
-        get() = when {
-            penaltyPoints < 8 -> RoadQuality.GOOD
-            penaltyPoints < 20 -> RoadQuality.FAIR
-            penaltyPoints < 40 -> RoadQuality.POOR
-            else -> RoadQuality.BAD
-        }
+        get() = serverQuality ?: qualityForPenalty(penaltyPoints)
 
     companion object {
         fun from(feature: Feature): RoadMapMetrics? {
             if (feature.geometry() !is LineString) return null
             val speed = feature.getNumberProperty(MEAN_SPEED)?.toDouble()
                 ?.takeIf { it.isFinite() && it >= 0 } ?: return null
+            val potholes = feature.getNumberProperty(POTHOLE_COUNT)?.toInt()
+                ?.takeIf { it >= 0 } ?: return null
+            val speedBumps = feature.getNumberProperty(SPEED_BUMP_COUNT)?.toInt()
+                ?.takeIf { it >= 0 } ?: return null
+            val serverQuality = mapQualityProperty(feature)
+            val serverPenalty = penaltyPointsProperty(feature)
+            val pavementScore = mapPavementScore(feature)
+            if (serverQuality != null && serverPenalty != null) {
+                return RoadMapMetrics(
+                    meanSpeedKmh = speed,
+                    pavementScore = pavementScore,
+                    potholes = potholes,
+                    speedBumps = speedBumps,
+                    serverPenaltyPoints = serverPenalty,
+                    serverQuality = serverQuality,
+                )
+            }
             return RoadMapMetrics(
                 meanSpeedKmh = speed,
-                pavementScore = mapPavementScore(feature) ?: return null,
-                potholes = feature.getNumberProperty(POTHOLE_COUNT)?.toInt() ?: return null,
-                speedBumps = feature.getNumberProperty(SPEED_BUMP_COUNT)?.toInt() ?: return null,
+                pavementScore = pavementScore ?: return null,
+                potholes = potholes,
+                speedBumps = speedBumps,
             )
         }
     }
+}
+
+private fun computePenaltyPoints(pavementScore: Int, meanSpeedKmh: Double, potholes: Int, speedBumps: Int): Long =
+    ((100 - pavementScore.coerceIn(0, 100)) * 0.25 +
+        (1.0 - meanSpeedKmh.coerceIn(0.0, 60.0) / 60.0) * 10).roundToInt() +
+        potholes * 20L + speedBumps * 12L
+
+private fun qualityForPenalty(penaltyPoints: Long): RoadQuality = when {
+    penaltyPoints < 8 -> RoadQuality.GOOD
+    penaltyPoints < 20 -> RoadQuality.FAIR
+    penaltyPoints < 40 -> RoadQuality.POOR
+    else -> RoadQuality.BAD
+}
+
+private fun mapQualityProperty(feature: Feature): RoadQuality? {
+    val code = feature.properties()?.get(MAP_QUALITY)
+        ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString ?: return null
+    return RoadQuality.entries.firstOrNull { it.code == code }
+}
+
+private fun penaltyPointsProperty(feature: Feature): Long? {
+    val raw = feature.properties()?.get(PENALTY_POINTS)
+        ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isNumber }?.asDouble ?: return null
+    if (!raw.isFinite() || raw < 0.0 || raw > Long.MAX_VALUE.toDouble() || raw % 1.0 != 0.0) return null
+    return raw.toLong()
 }
 
 private fun mapPavementScore(feature: Feature): Int? {

@@ -20,14 +20,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal data class SyncUiState(
-    val hasToken: Boolean,
     val pending: PendingUploads,
     val running: Boolean,
     @StringRes val message: Int?,
 )
 
 @Composable
-internal fun rememberSyncState(tokenVersion: Int = 0): SyncUiState {
+internal fun rememberSyncState(): SyncUiState {
     val context = LocalContext.current.applicationContext
     val work by remember(context) {
         WorkManager.getInstance(context).getWorkInfosForUniqueWorkFlow(RecordingSync.WORK_NAME)
@@ -38,14 +37,12 @@ internal fun rememberSyncState(tokenVersion: Int = 0): SyncUiState {
     LaunchedEffect(pendingVersion, recorder.finishedCount, recorder.isRecording, work) {
         pending = withContext(Dispatchers.IO) { RecordingStore.pending(context) }
     }
-    val hasToken = remember(tokenVersion, work) { RecordingSync.hasToken(context) }
     val running = work.any { it.state == WorkInfo.State.RUNNING }
-    return SyncUiState(hasToken, pending, running, syncMessage(context, hasToken, pending, work))
+    return SyncUiState(pending, running, syncMessage(context, pending, work))
 }
 
 @StringRes
-private fun syncMessage(context: Context, hasToken: Boolean, pending: PendingUploads, work: List<WorkInfo>): Int? {
-    if (!hasToken) return if (pending.trips > 0) R.string.sync_off else null
+private fun syncMessage(context: Context, pending: PendingUploads, work: List<WorkInfo>): Int? {
     if (work.any { it.state == WorkInfo.State.RUNNING }) return R.string.sync_running
     if (pending.trips == 0) return null
     val waitingForConnection = if (RecordingSync.usesMobileData(context)) {

@@ -111,6 +111,31 @@ class RoadMapMetricsTest {
         assertEquals(RoadQuality.BAD, pothole.quality)
     }
 
+    @Test
+    fun acceptsServerScoringForPublicAggregateWithoutRawRoughnessOrScore() {
+        val json = """{"type":"Feature","id":"11111111-1111-1111-1111-111111111111",""" +
+            """"geometry":{"type":"LineString","coordinates":[[-46.7,-23.5],[-46.7001,-23.5001]]},""" +
+            """"properties":{"kind":"segment","speed_kmh":36.5,"potholes":1,"speed_bumps":2,""" +
+            """"map_quality":"poor","penalty_points":33}}"""
+        val metrics = checkNotNull(RoadMapMetrics.from(Feature.fromJson(json)))
+        assertEquals(36.5, metrics.meanSpeedKmh, 0.0)
+        assertEquals(1, metrics.potholes)
+        assertEquals(2, metrics.speedBumps)
+        assertEquals(33L, metrics.penaltyPoints)
+        assertEquals(RoadQuality.POOR, metrics.quality)
+        assertEquals(null, metrics.pavementScore)
+    }
+
+    @Test
+    fun prefersServerScoringWhenPresentAlongsideRawMetrics() {
+        val feature = archivedSegment(0.60)
+        feature.addStringProperty(MAP_QUALITY, RoadQuality.BAD.code)
+        feature.addNumberProperty(PENALTY_POINTS, 42)
+        val metrics = checkNotNull(RoadMapMetrics.from(feature))
+        assertEquals(42L, metrics.penaltyPoints)
+        assertEquals(RoadQuality.BAD, metrics.quality)
+    }
+
     private fun archivedSegment(roughness: Double): Feature {
         val start = GeoPoint(-23.53, -46.76)
         val end = start.copy(lon = -46.7597)

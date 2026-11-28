@@ -13,15 +13,22 @@ internal const val SYNC_OUTCOME = "recording-sync-outcome"
 
 internal class RecordingUploadWorker(context: Context, parameters: WorkerParameters) : Worker(context, parameters) {
     override fun doWork(): Result {
-        val token = RecordingSync.token(applicationContext) ?: return failure(ArchiveOutcome.UNAUTHORIZED)
+        RecordingSync.clearLegacyToken(applicationContext)
+        val files = RecordingStore.archiveFiles(applicationContext)
+        if (files.none { it.exists() && (it.extension == "csv" || it.extension == "ndjson") }) {
+            RecordingSync.notifyPendingChanged()
+            return Result.success()
+        }
+        val installationId = RecordingSync.installationId(applicationContext)
+        val token = RecordingSync.enrollmentToken(applicationContext)
         val archiver = RecordingArchiver(
             api = HttpArchiveApi(token),
             checkpoints = PreferenceCheckpoints(RecordingSync.checkpoints(applicationContext)),
-            installationId = RecordingSync.installationId(applicationContext),
-            isCancelled = { isStopped || RecordingSync.token(applicationContext) != token },
+            installationId = installationId,
+            isCancelled = { isStopped },
             onPublished = RecordingSync::notifyPublished,
         )
-        val outcome = archiver.run(RecordingStore.archiveFiles(applicationContext))
+        val outcome = archiver.run(files)
         RecordingSync.notifyPendingChanged()
         return when (outcome) {
             ArchiveOutcome.SUCCESS -> Result.success()
@@ -34,6 +41,9 @@ internal class RecordingUploadWorker(context: Context, parameters: WorkerParamet
 }
 
 private class HttpArchiveApi(private val token: String) : ArchiveApi {
+    override fun registerInstallation(installationId: String): Int =
+        PilotMapApi.registerInstallation(installationId, token)
+
     override fun putPart(id: UUID, kind: String, number: Int, parts: Int, name: String, bytes: ByteArray): Int =
         PilotMapApi.putPart("/v1/recordings/$id/$kind/$number?parts=$parts&name=$name", bytes, token)
 

@@ -19,7 +19,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -58,7 +57,7 @@ private fun allGranted(context: Context): Boolean = requiredPermissions().all {
 }
 
 @Composable
-fun RecordScreen(onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
+fun RecordScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val status by RecorderState.status.collectAsStateWithLifecycle()
     val sync = rememberSyncState()
@@ -68,7 +67,7 @@ fun RecordScreen(onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
         permissionDenied = !RecorderService.hasLocationPermission(context)
-        if (!permissionDenied && RecordingSync.hasToken(context)) RecorderService.start(context)
+        if (!permissionDenied) RecorderService.start(context)
     }
 
     LazyColumn(
@@ -84,27 +83,12 @@ fun RecordScreen(onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
-        if (!sync.hasToken && !status.isRecording) {
-            item {
-                Card(
-                    Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-                ) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(stringResource(R.string.record_needs_token))
-                        Button(onClick = onOpenSettings) { Text(stringResource(R.string.record_open_settings)) }
-                    }
-                }
-            }
-        }
         item { StatusCard(status) }
         item {
             Button(
-                enabled = status.isRecording || sync.hasToken,
                 onClick = {
                     when {
                         status.isRecording -> RecorderService.stop(context)
-                        !RecordingSync.hasToken(context) -> onOpenSettings()
                         allGranted(context) -> RecorderService.start(context)
                         else -> permissionLauncher.launch(requiredPermissions())
                     }
@@ -153,7 +137,7 @@ private fun UploadCard(sync: SyncUiState, onRetry: () -> Unit) {
             )
             sync.message?.let { Text(stringResource(it), style = MaterialTheme.typography.bodyMedium) }
             Text(stringResource(R.string.uploads_note), style = MaterialTheme.typography.bodySmall)
-            if (sync.hasToken && sync.pending.trips > 0 && !sync.running) {
+            if (sync.pending.trips > 0 && !sync.running) {
                 FilledTonalButton(onClick = onRetry) { Text(stringResource(R.string.uploads_retry)) }
             }
         }

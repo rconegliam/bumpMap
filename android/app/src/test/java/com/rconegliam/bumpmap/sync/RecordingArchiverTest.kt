@@ -27,8 +27,15 @@ class RecordingArchiverTest {
         val parts = mutableMapOf<String, MutableMap<Int, ByteArray>>()
         val observations = mutableMapOf<String, String>()
         val putRequests = mutableListOf<String>()
+        val registrations = mutableListOf<String>()
+        var registerStatus: () -> Int = { 204 }
         var putStatus: ((String, Int) -> Int?) = { _, _ -> null }
         var publishStatus: (List<Feature>) -> Int? = { null }
+
+        override fun registerInstallation(installationId: String): Int {
+            registrations += installationId
+            return registerStatus()
+        }
 
         override fun putPart(id: UUID, kind: String, number: Int, parts: Int, name: String, bytes: ByteArray): Int {
             val key = "$id/$kind/$name/$parts"
@@ -222,5 +229,51 @@ class RecordingArchiverTest {
         assertEquals(ArchiveOutcome.SUCCESS, archiver().run(listOf(ndjson)))
         assertFalse(ndjson.exists())
         assertEquals(3, server.observations.size)
+    }
+
+    @Test
+    fun registersOnceBeforeUploadingAndSkipsWhenNoPendingFiles() {
+        assertEquals(ArchiveOutcome.SUCCESS, archiver().run(emptyList()))
+        assertTrue(server.registrations.isEmpty())
+
+        val first = recording("bumpmap_20261128_100000")
+        val second = recording("bumpmap_20261128_110000")
+        assertEquals(ArchiveOutcome.SUCCESS, archiver().run(first + second))
+        assertEquals(listOf(INSTALLATION), server.registrations)
+    }
+
+    @Test
+    fun enrollmentConflictKeepsFilesWithoutUploading() {
+        val files = recording("bumpmap_20261128_100000")
+        server.registerStatus = { 409 }
+
+        assertEquals(ArchiveOutcome.UNAUTHORIZED, archiver().run(files))
+        assertTrue(files.all { it.exists() })
+        assertTrue(server.putRequests.isEmpty())
+    }
+
+    @Test
+    fun enrollmentRateLimitRetriesAndKeepsFiles() {
+        val files = recording("bumpmap_20261128_100000")
+        server.registerStatus = { 429 }
+
+        assertEquals(ArchiveOutcome.RETRY, archiver().run(files))
+        assertTrue(files.all { it.exists() })
+        assertTrue(server.putRequests.isEmpty())
+    }
+
+    @Test
+    fun unauthorizedUploadReRegistersOnNextAttempt() {
+        val files = recording("bumpmap_20261128_100000")
+        server.putStatus = { _, _ -> 401 }
+
+        assertEquals(ArchiveOutcome.UNAUTHORIZED, archiver().run(files))
+        assertTrue(files.all { it.exists() })
+        assertEquals(listOf(INSTALLATION), server.registrations)
+
+        server.putStatus = { _, _ -> null }
+        assertEquals(ArchiveOutcome.SUCCESS, archiver().run(files))
+        assertEquals(listOf(INSTALLATION, INSTALLATION), server.registrations)
+        assertFalse(files.any { it.exists() })
     }
 }

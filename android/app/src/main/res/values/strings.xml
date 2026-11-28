@@ -7,7 +7,6 @@
     <string name="tab_settings">Settings</string>
 
     <string name="map_no_data">No measured roads in this area yet.</string>
-    <string name="map_needs_token">Add the server access token in Settings to see the shared map.</string>
     <string name="map_unavailable">Could not reach the BumpMap server. Move the map to try again.</string>
     <string name="map_filter_all">All</string>
     <string name="map_filter_potholes">Potholes</string>
@@ -49,9 +48,6 @@
     <string name="mark_pothole">Pothole</string>
     <string name="mark_rough">Rough pavement</string>
 
-    <string name="record_needs_token">Recording requires the BumpMap server. Add your access token in Settings first.</string>
-    <string name="record_open_settings">Open Settings</string>
-
     <string name="uploads_title">Server upload</string>
     <plurals name="uploads_pending">
         <item quantity="one">%1$d trip waiting for the server (%2$s)</item>
@@ -73,25 +69,14 @@
     <string name="settings_about">About</string>
     <string name="settings_version">Version %1$s</string>
     <string name="settings_map_data">Map data © OpenStreetMap contributors. Base map by OpenFreeMap.</string>
-    <string name="sync_title">Server sync (required)</string>
-    <string name="sync_description">BumpMap saves every drive in its server database. Recording and the map need an access token. Uploads include GPS routes, sensor readings, manual marks and automatic detections. Measured road sections, average speeds and detections appear on the shared map.</string>
-    <string name="sync_token">Server access token</string>
-    <string name="sync_save_token">Save token</string>
-    <string name="sync_update_token">Update token</string>
-    <string name="sync_remove_token">Remove token</string>
-    <string name="sync_checking">Checking the token with the server…</string>
-    <string name="sync_token_saved">Access token saved. Recording is enabled.</string>
-    <string name="sync_token_missing">No access token. Recording is disabled.</string>
-    <string name="sync_token_rejected">The server rejected this token. Check it and try again.</string>
-    <string name="sync_token_unreachable">Could not reach the server to check the token. Connect to the internet and try again.</string>
-    <string name="sync_remove_warning">Trips waiting for upload stay on this phone until you save a token again.</string>
+    <string name="sync_title">Server sync</string>
+    <string name="sync_description">BumpMap automatically uploads finished drives to its server database and loads the shared map from all installations. Uploads include GPS routes, sensor readings, manual marks and automatic detections. Measured road sections, average speeds and detections appear on the shared map.</string>
     <string name="sync_mobile_data">Upload over mobile data</string>
     <string name="sync_mobile_data_description">Off: uploads wait for Wi-Fi or another unmetered network. Recordings use about 50 MB per hour.</string>
-    <string name="sync_off">Uploads are paused until an access token is saved.</string>
     <string name="sync_waiting_wifi">Waiting for Wi-Fi to upload.</string>
     <string name="sync_waiting_network">Waiting for a connection to upload.</string>
     <string name="sync_running">Uploading to the server…</string>
-    <string name="sync_unauthorized">The server rejected the access token. Update it in Settings. Your trips stay on this phone.</string>
+    <string name="sync_unauthorized">The server could not authorize this app installation. Your trips stay on this phone.</string>
     <string name="sync_archive_full">The server archive is full. Your trips stay on this phone until there is space.</string>
     <string name="sync_rejected">The server refused some trips. They stay on this phone and will be sent again on the next retry.</string>
     <string name="sync_retrying">Upload interrupted. It will retry automatically.</string>
