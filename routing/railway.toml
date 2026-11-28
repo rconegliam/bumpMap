@@ -1,6 +1,2 @@
 [build]
 builder = "DOCKERFILE"
-
-[deploy]
-healthcheckPath = "/nearest/v1/driving/-46.6333,-23.5505"
-healthcheckTimeout = 60

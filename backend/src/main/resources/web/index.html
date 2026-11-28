@@ -8,6 +8,8 @@
     <title>BumpMap — Mapa de qualidade das vias</title>
     <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous">
     <link rel="stylesheet" href="/assets/app.css">
+    <link rel="stylesheet" href="/assets/routes.css">
+    <link rel="stylesheet" href="/assets/statistics.css">
     <script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
     <script type="module" src="/assets/app.js"></script>
 </head>
@@ -26,19 +28,33 @@
             <h1 id="title" data-text="title">Qualidade das vias</h1>
             <p class="intro-copy" data-text="intro">Explore os trechos medidos pelo BumpMap e veja onde foram detectados buracos e lombadas.</p>
         </section>
-        <section class="board" aria-labelledby="explore">
-            <aside class="controls">
-                <h2 id="explore" data-text="explore">Consultar o mapa</h2>
+        <section class="access-panel" aria-labelledby="access-title">
+            <div>
+                <h2 id="access-title" data-text="accessTitle">Acesso às medições</h2>
                 <p class="help" data-text="accessHelp">Use um token de somente leitura para carregar as medições. Ele não é salvo.</p>
-                <form id="access" method="post" autocomplete="off">
+                <p id="access-error" role="alert" hidden></p>
+            </div>
+            <form id="access" method="post" autocomplete="off">
+                <div>
                     <label for="token" data-text="token">Token de leitura</label>
                     <input id="token" type="password" required autocomplete="new-password" autocapitalize="none" spellcheck="false" maxlength="4096">
-                    <button class="primary" type="submit" data-text="connect">Carregar medições</button>
-                </form>
-                <div class="session" id="session" hidden>
-                    <button type="button" id="refresh" data-text="refresh">Atualizar</button>
-                    <button type="button" id="disconnect" data-text="disconnect">Encerrar consulta</button>
                 </div>
+                <button class="primary" type="submit" data-text="connect">Carregar medições</button>
+            </form>
+            <div class="session" id="session" hidden>
+                <button type="button" id="refresh" data-text="refresh">Atualizar</button>
+                <button type="button" id="disconnect" data-text="disconnect">Encerrar consulta</button>
+            </div>
+        </section>
+        <div class="views" role="tablist" data-label="views" aria-label="Consultas">
+            <button type="button" id="tab-map" role="tab" data-view="map" data-text="tabMap" aria-controls="view-map" aria-selected="true">Mapa</button>
+            <button type="button" id="tab-cities" role="tab" data-view="cities" data-text="tabCities" aria-controls="view-cities" aria-selected="false" tabindex="-1">Cidades</button>
+            <button type="button" id="tab-states" role="tab" data-view="states" data-text="tabStates" aria-controls="view-states" aria-selected="false" tabindex="-1">Estados</button>
+            <button type="button" id="tab-countries" role="tab" data-view="countries" data-text="tabCountries" aria-controls="view-countries" aria-selected="false" tabindex="-1">Países</button>
+            <button type="button" id="tab-rankings" role="tab" data-view="rankings" data-text="tabRankings" aria-controls="view-rankings" aria-selected="false" tabindex="-1">Rankings</button>
+        </div>
+        <section class="board" id="view-map" role="tabpanel" aria-labelledby="tab-map">
+            <aside class="controls">
                 <fieldset>
                     <legend data-text="filter">Exibir</legend>
                     <div class="filters">
@@ -59,6 +75,7 @@
                         <li><span class="dot speed_bump"></span><span data-text="speed_bump">Lombada</span></li>
                     </ul>
                 </div>
+                <div id="route-planner"></div>
             </aside>
             <div class="map-panel">
                 <div class="map-bar">
@@ -67,11 +84,21 @@
                 <div id="map" role="region" data-label="map" aria-label="Mapa de qualidade das vias"></div>
             </div>
         </section>
-        <section class="about" aria-labelledby="about">
+        <section class="statistics-panel" id="view-cities" role="tabpanel" aria-labelledby="tab-cities" tabindex="0" hidden></section>
+        <section class="statistics-panel" id="view-states" role="tabpanel" aria-labelledby="tab-states" tabindex="0" hidden></section>
+        <section class="statistics-panel" id="view-countries" role="tabpanel" aria-labelledby="tab-countries" tabindex="0" hidden></section>
+        <section class="statistics-panel" id="view-rankings" role="tabpanel" aria-labelledby="tab-rankings" tabindex="0" hidden></section>
+        <section class="about" id="map-about" aria-labelledby="about">
             <h2 id="about" data-text="about">Como funciona</h2>
             <p data-text="instructions">Mova o mapa ou aproxime o zoom para consultar outra área. Selecione um trecho ou um marcador para ver os detalhes da medição. As cores indicam a qualidade do pavimento apenas nos trechos medidos.</p>
             <noscript>Ative o JavaScript para usar o mapa. / Enable JavaScript to use the map.</noscript>
         </section>
     </main>
+    <footer class="wrap geography-credit">
+        <span data-text="geographyCredit">Dados geográficos</span>
+        <a href="https://www.openstreetmap.org/copyright" data-text="osmCredit">© colaboradores do OpenStreetMap</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais/15774-malhas.html">IBGE</a>
+    </footer>
 </body>
 </html>

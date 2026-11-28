@@ -26,6 +26,7 @@ internal data class MapStatisticsItem(
 internal fun DataSource.readMapStatistics(query: MapStatisticsQuery): MapStatisticsPage =
     connection.use { connection ->
         connection.prepareStatement(statisticsSql(query)).use { statement ->
+            statement.queryTimeout = 15
             val areaLevel = if (query.level == MapStatisticsLevel.STREET) MapStatisticsLevel.CITY else query.level
             statement.setString(1, areaLevel.parameter)
             statement.setInt(2, query.limit)

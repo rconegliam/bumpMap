@@ -48,10 +48,14 @@ fun main() {
     require(token.length >= 32) { "BUMPMAP_API_TOKEN must be at least 32 characters" }
     val archiveLimit = env["BUMPMAP_ARCHIVE_MAX_BYTES"]?.toLong() ?: DEFAULT_ARCHIVE_MAX_BYTES
     require(archiveLimit > 0) { "BUMPMAP_ARCHIVE_MAX_BYTES must be positive" }
+    val routingProvider = OsrmRoutingProvider.fromEnvironment(env)
     databasePool(env).use { pool ->
         migrate(pool)
         embeddedServer(Netty, host = "0.0.0.0", port = env["PORT"]?.toInt() ?: 8080) {
-            bumpMapApi(ObservationStore(pool), RecordingStore(pool, archiveLimit), token, env["BUMPMAP_MAP_READ_TOKEN"])
+            bumpMapApi(
+                ObservationStore(pool), RecordingStore(pool, archiveLimit), token,
+                env["BUMPMAP_MAP_READ_TOKEN"], routingProvider,
+            )
         }.start(wait = true)
     }
 }
@@ -61,6 +65,7 @@ internal fun Application.bumpMapApi(
     recordings: RecordingStore,
     token: String,
     mapReadToken: String? = null,
+    routingProvider: OsrmRoutingProvider? = null,
 ) {
     val tokenBytes = token.toByteArray()
     val mapReadDigest = mapReadToken?.takeUnless(String::isBlank)?.let(::mapTokenDigest)
@@ -107,6 +112,8 @@ internal fun Application.bumpMapApi(
     routing {
         websiteRoutes()
         mapRoutes(store)
+        mapStatisticsRoutes(store)
+        routingRoutes(routingProvider)
         get("/health") {
             call.response.header(HttpHeaders.CacheControl, "no-store")
             if (withContext(Dispatchers.IO) { store.ready() }) {

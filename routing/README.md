@@ -7,6 +7,7 @@ pavement scores.
 
 The **routing** service in Railway should have only a private network
 address. Deploy it with `PORT=5000`, without a public domain or TCP proxy.
+Set `BUMPMAP_ROUTING_BASE_URL=http://routing.railway.internal:5000` on the API.
 From the repository root:
 
 ```sh

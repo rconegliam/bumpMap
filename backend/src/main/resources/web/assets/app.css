@@ -41,6 +41,46 @@ button { cursor: pointer; }
 .intro { padding-block: clamp(1.4rem, 4vw, 3.4rem) 1.5rem; }
 h1 { font-size: clamp(2rem, 5vw, 3.6rem); letter-spacing: -.05em; line-height: 1.1; margin-block: .35rem .65rem; }
 .intro-copy { color: var(--subtle); max-width: 60ch; }
+.access-panel {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .85rem 1.25rem;
+    background: white;
+    border: 1px solid var(--edge);
+    border-radius: .9rem;
+    padding: .85rem 1.15rem;
+}
+.access-panel .help { margin-block: .15rem 0; }
+#access { display: flex; align-items: end; flex-wrap: wrap; gap: .35rem .6rem; }
+#access > div { flex: 1 1 13rem; }
+#access label { display: block; margin-block-end: .2rem; }
+#access-error, #status[data-error="true"] { color: #9a241f; font-weight: 650; }
+#access-error { margin-block-start: .35rem; font-size: .875rem; }
+.views {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem .45rem;
+    margin-block: 1.25rem .65rem;
+}
+.views button {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: .45rem;
+    color: var(--ink);
+    font-weight: 650;
+    padding: .45rem .75rem;
+}
+.views button:hover { background: white; border-color: var(--edge); }
+.views [aria-selected="true"], .views [aria-selected="true"]:hover {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+}
+.statistics-panel {
+    margin-block-end: 2rem;
+}
 .board {
     background: white;
     display: grid;
@@ -52,13 +92,13 @@ h1 { font-size: clamp(2rem, 5vw, 3.6rem); letter-spacing: -.05em; line-height: 1
 .controls { padding: 1.15rem; border-inline-end: 1px solid var(--edge); }
 h2 { font-size: 1.13rem; }
 .help { margin-block: .4rem .9rem; color: var(--subtle); font-size: .88rem; }
-form { display: grid; gap: .45rem; }
-form label, legend, .legend h3 { font-size: .9rem; font-weight: 700; }
+#access label, legend, .legend h3 { font-size: .9rem; font-weight: 700; }
 #token { width: 100%; padding: .45rem .6rem; border: 1px solid #849e90; border-radius: .45rem; }
 .primary { border: 0; background: var(--accent); color: white; border-radius: .45rem; padding: .5rem .65rem; font-weight: 650; }
 .primary:hover, .languages [aria-pressed="true"]:hover { background: #0a4b3b; }
 .session { display: flex; flex-wrap: wrap; gap: .35rem; }
 fieldset { padding: 0; border: 0; margin: 1.35rem 0 1rem; min-width: 0; }
+.controls > fieldset { margin-block-start: 0; }
 legend { padding: 0; margin-bottom: .35rem; }
 .filters { display: flex; flex-wrap: wrap; gap: .25rem; }
 .filters label { display: inline-grid; cursor: pointer; }
@@ -81,7 +121,6 @@ legend { padding: 0; margin-bottom: .35rem; }
 .speed_bump { background: var(--speed_bump); }
 .map-panel { display: flex; flex-direction: column; background: #e4ede8; }
 .map-bar { background: white; padding: .65rem 1rem; border-bottom: 1px solid var(--edge); font-size: .88rem; }
-#status[data-error="true"] { color: #9a241f; font-weight: 650; }
 #map { min-height: clamp(26rem, 61vh, 50rem); flex: 1; }
 .observation-popup .maplibregl-popup-content { color: var(--ink); padding: 12px 25px 12px 12px; }
 .observation-popup h3 { font-size: .93rem; }
@@ -89,6 +128,8 @@ legend { padding: 0; margin-bottom: .35rem; }
 .observation-popup dd { margin: 0; font-weight: 650; }
 .about { padding-block: 1.15rem 2.25rem; }
 .about p { margin-block-start: .3rem; color: var(--subtle); max-width: 75ch; }
+.geography-credit { display: flex; flex-wrap: wrap; gap: .35rem .6rem; padding-block-end: 1.2rem; color: var(--subtle); font-size: .82rem; }
+.geography-credit a { color: var(--accent); }
 
 @media (max-width: 44rem) {
     .board { grid-template-columns: minmax(0, 1fr); }

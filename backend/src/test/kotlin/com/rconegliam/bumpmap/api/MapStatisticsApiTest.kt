@@ -7,7 +7,6 @@ import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
-import io.ktor.server.routing.routing
 import io.ktor.server.testing.testApplication
 import java.util.UUID
 import javax.sql.DataSource
@@ -135,9 +134,7 @@ class MapStatisticsApiTest {
     }
 
     private fun Application.statisticsApi(database: DataSource) {
-        val store = ObservationStore(database)
-        bumpMapApi(store, RecordingStore(database), WRITE_TOKEN, READ_TOKEN)
-        routing { mapStatisticsRoutes(store) }
+        bumpMapApi(ObservationStore(database), RecordingStore(database), WRITE_TOKEN, READ_TOKEN)
     }
 
     private suspend fun HttpClient.statistics(query: String): MapStatisticsPage {

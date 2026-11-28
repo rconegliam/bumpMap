@@ -2,7 +2,9 @@ export const messages = {
     "pt-BR": {
         language: "Idioma", title: "Qualidade das vias",
         intro: "Explore os trechos medidos pelo BumpMap e veja onde foram detectados buracos e lombadas.",
-        explore: "Consultar o mapa", accessHelp: "Use um token de somente leitura para carregar as medições. Ele não é salvo.",
+        accessTitle: "Acesso às medições", accessHelp: "Use um token de somente leitura para carregar as medições. Ele não é salvo.",
+        views: "Consultas", tabMap: "Mapa", tabCities: "Cidades", tabStates: "Estados", tabCountries: "Países", tabRankings: "Rankings",
+        geographyCredit: "Dados geográficos", osmCredit: "© colaboradores do OpenStreetMap",
         token: "Token de leitura", connect: "Carregar medições", refresh: "Atualizar", disconnect: "Encerrar consulta",
         filter: "Exibir", all: "Todos", potholePlural: "Buracos", bumpPlural: "Lombadas", speeds: "Mostrar velocidades",
         legend: "Legenda", good: "Boa", fair: "Regular", poor: "Ruim", bad: "Péssima",
@@ -30,7 +32,9 @@ export const messages = {
     en: {
         language: "Language", title: "Road quality",
         intro: "Explore road sections measured by BumpMap and see where potholes and speed bumps were detected.",
-        explore: "Explore the map", accessHelp: "Use a read-only token to load observations. It is not saved.",
+        accessTitle: "Observation access", accessHelp: "Use a read-only token to load observations. It is not saved.",
+        views: "Explore", tabMap: "Map", tabCities: "Cities", tabStates: "States", tabCountries: "Countries", tabRankings: "Rankings",
+        geographyCredit: "Geographic data", osmCredit: "© OpenStreetMap contributors",
         token: "Read-only token", connect: "Load observations", refresh: "Refresh", disconnect: "End session",
         filter: "Show", all: "All", potholePlural: "Potholes", bumpPlural: "Speed bumps", speeds: "Show speeds",
         legend: "Legend", good: "Good", fair: "Fair", poor: "Poor", bad: "Bad",

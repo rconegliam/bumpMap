@@ -10,6 +10,9 @@ in PostgreSQL with PostGIS. Keep the pilot token on trusted test clients.
 | POST | `/v1/observations` | Accepts a GeoJSON FeatureCollection with 1 to 100 observations and returns the accepted count |
 | GET | `/v1/observations?bbox=west,south,east,north` | Returns up to 500 intersecting features in a GeoJSON FeatureCollection |
 | GET | `/v1/map/observations?bbox=west,south,east,north` | Returns up to 500 intersecting recording-derived features for the pilot website |
+| GET | `/v1/map/statistics?level=city&sort=coverage&limit=20&offset=0` | Returns statistics or ranked results for measured cities, states, countries or streets |
+| GET | `/v1/map/route?from=lon,lat&to=lon,lat` | Calculates a car route between two points in the pilot area |
+| GET | `/v1/map/route/config` | Reports whether routing is enabled and whether the provider is external |
 | PUT | `/v1/recordings/{id}/{kind}/{number}?parts=…&name=…` | Saves one part of an original recording file and returns 204 |
 
 The legacy `/v1/observations` routes require `Authorization: Bearer <BUMPMAP_API_TOKEN>`.
@@ -30,7 +33,7 @@ coordinates and no trip metadata.
 ## Pilot map
 
 The website shell is public; exact observation locations are not public data.
-The map endpoint requires `Authorization: Bearer <BUMPMAP_MAP_READ_TOKEN>`.
+All `/v1/map` endpoints require `Authorization: Bearer <BUMPMAP_MAP_READ_TOKEN>`.
 The map token does not work on the archive or legacy observation routes, and
 the API token does not work on the map endpoint. Give the map token only to
 authorized pilot users; never embed it in bundled website resources or put it
@@ -47,6 +50,32 @@ Scored segments have `quality`, `score`, `roughness` (when available), `potholes
 Map penalties use the current Android pavement calibration from `roughness`
 (0.6 to 2.5), falling back to the stored `score` when roughness is absent.
 The returned `score` and `quality` are unchanged from the stored observation.
+
+### Statistics and rankings
+
+Use `level=city|state|country|street` and `sort=coverage|best|worst`.
+Coverage sorts by measured segment count. Best and worst sort by average
+map penalty, which combines pavement, measured speed, potholes and speed
+bumps. The response has `items` and `total`. Each item includes the segment
+count, measured kilometres, mean speed and penalty, and obstacle totals.
+Use `limit` from 1 to 100 (default 50) and a zero-based `offset` (default 0).
+
+Statistics include qualifying recorded passages. The area is assigned by
+the midpoint of each measured segment. A street must have an OpenStreetMap
+name and match within 25 metres of that midpoint within the segment's city.
+Ways with the same name in a city are grouped together. Repeated passages
+add to the distance and obstacle totals, and small samples can appear in
+rankings. Only places with qualifying data appear.
+The [geography snapshot](../docs/geography.md) documents the boundary and
+street sources and coverage.
+
+### Car routes
+
+Set the origin and destination on the map to draw a route and get an
+estimated distance and duration. The [private OSRM service](../routing/)
+calculates the route with OpenStreetMap's car profile. The estimate uses
+the road network and typical speeds from the profile. BumpMap penalties
+and live traffic are outside this estimate.
 
 ## Recording archives
 
@@ -94,7 +123,7 @@ docker stop bumpmap-test-postgis
 
 ## Railway
 
-The `pilot` environment uses an `api` service and a `postgis` service.
+The `pilot` environment uses `api`, `postgis` and `routing` services.
 Provision PostgreSQL with `postgis/postgis:17-3.5`, mount a persistent volume
 at `/var/lib/postgresql/data`, and set `PGDATA` to a subdirectory of that path.
 Keep the database on the private network and expose HTTPS only for the API.
@@ -106,6 +135,10 @@ to a separate random secret of at least 32 characters to enable pilot map
 queries. The service rejects a configuration that reuses the API token as the
 map token. The API binds to `PORT` (default 8080) and applies database
 migrations before serving requests.
+
+Set `BUMPMAP_ROUTING_BASE_URL=http://routing.railway.internal:5000` on the
+API to use the [private pilot router](../routing/README.md). For local
+development with the router running, use `http://127.0.0.1:5000`.
 
 From the repository root, an authorized Railway CLI can upload this directory
 as the API service's build context.

@@ -29,4 +29,6 @@ Current features:
 
 The web map is served at the root of the Railway API URL and uses a dedicated read-only pilot code. Android and the website consult the same PostgreSQL database.
 
+The website provides map filters, car routes in the pilot area, city/state/country statistics, and rankings by street, city, state and country.
+
 See [backend/README.md](backend/README.md) for pilot setup, API configuration, and deployment.
