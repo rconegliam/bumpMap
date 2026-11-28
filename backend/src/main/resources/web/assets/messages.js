@@ -1,7 +1,7 @@
 export const messages = {
     "pt-BR": {
-        language: "Idioma", eyebrow: "MAPA COLABORATIVO", title: "Qualidade das vias",
-        intro: "Explore os trechos medidos pelo bumpMap e veja onde foram detectados buracos e lombadas.",
+        language: "Idioma", title: "Qualidade das vias",
+        intro: "Explore os trechos medidos pelo BumpMap e veja onde foram detectados buracos e lombadas.",
         explore: "Consultar o mapa", accessHelp: "Use um token de somente leitura para carregar as medições. Ele não é salvo.",
         token: "Token de leitura", connect: "Carregar medições", refresh: "Atualizar", disconnect: "Encerrar consulta",
         filter: "Exibir", all: "Todos", potholePlural: "Buracos", bumpPlural: "Lombadas", speeds: "Mostrar velocidades",
@@ -28,8 +28,8 @@ export const messages = {
         toggleAttribution: "Mostrar ou ocultar créditos", mapTitle: "Mapa",
     },
     en: {
-        language: "Language", eyebrow: "CROWDSOURCED MAP", title: "Road quality",
-        intro: "Explore road sections measured by bumpMap and see where potholes and speed bumps were detected.",
+        language: "Language", title: "Road quality",
+        intro: "Explore road sections measured by BumpMap and see where potholes and speed bumps were detected.",
         explore: "Explore the map", accessHelp: "Use a read-only token to load observations. It is not saved.",
         token: "Read-only token", connect: "Load observations", refresh: "Refresh", disconnect: "End session",
         filter: "Show", all: "All", potholePlural: "Potholes", bumpPlural: "Speed bumps", speeds: "Show speeds",

@@ -8,7 +8,7 @@ const colors = {
 };
 const quality = new Set(["good", "fair", "poor", "bad"]);
 const eventTypes = new Set(["pothole", "speed_bump"]);
-const minQueryZoom = 10;
+const pilotBounds = [[-46.89, -23.60], [-46.61, -23.48]];
 const maxBoxSpan = 1;
 const maxPages = 20;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -67,7 +67,7 @@ function updateMapLabels() {
 function setLanguage(value) {
     language = value;
     document.documentElement.lang = value;
-    document.title = `bumpMap — ${t("map")}`;
+    document.title = `BumpMap — ${t("map")}`;
     for (const node of document.querySelectorAll("[data-text]")) node.textContent = t(node.dataset.text);
     for (const node of document.querySelectorAll("[data-label]")) node.setAttribute("aria-label", t(node.dataset.label));
     for (const button of localeButtons) button.setAttribute("aria-pressed", String(button.dataset.language === value));
@@ -173,10 +173,6 @@ function lock(key = "locked") {
 async function loadViewport() {
     cancelRequest();
     if (!token || !mapReady) return;
-    if (map.getZoom() < minQueryZoom) {
-        showStatus("zoom");
-        return;
-    }
     const { bbox, error } = viewportBox();
     if (error) {
         showStatus(error, error !== "zoom");
@@ -318,7 +314,8 @@ function initMap() {
     }
     try {
         map = new maplibregl.Map({
-            container: "map", style: styleUrl, center: [-46.80, -23.52], zoom: 12,
+            container: "map", style: styleUrl, bounds: pilotBounds,
+            fitBoundsOptions: { padding: 24, maxZoom: 12 },
             renderWorldCopies: false, dragRotate: false, pitchWithRotate: false,
         });
     } catch {
