@@ -14,7 +14,12 @@
     margin-block: .35rem .75rem;
 }
 
-.route-planner form { gap: .35rem; }
+.route-planner form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+    gap: .35rem;
+}
 .route-planner label:not(:first-child) { margin-block-start: .35rem; }
 
 .route-planner input {
