@@ -43,7 +43,6 @@ private class HttpArchiveApi(private val token: String) : ArchiveApi {
 private class PreferenceCheckpoints(private val preferences: SharedPreferences) : ArchiveCheckpoints {
     override fun getInt(key: String) = preferences.getInt(key, 0)
     override fun putInt(key: String, value: Int) = preferences.edit().putInt(key, value).commit()
-    override fun getBoolean(key: String) = preferences.getBoolean(key, false)
     override fun putBoolean(key: String, value: Boolean) = preferences.edit().putBoolean(key, value).commit()
     override fun remove(keys: List<String>) = preferences.edit().apply { keys.forEach(::remove) }.commit()
 }

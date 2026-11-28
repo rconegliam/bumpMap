@@ -58,7 +58,7 @@ class RecordingArchiverTest {
         val values = mutableMapOf<String, Any>()
         override fun getInt(key: String) = values[key] as? Int ?: 0
         override fun putInt(key: String, value: Int) = true.also { values[key] = value }
-        override fun getBoolean(key: String) = values[key] as? Boolean ?: false
+        fun getBoolean(key: String) = values[key] as? Boolean ?: false
         override fun putBoolean(key: String, value: Boolean) = true.also { values[key] = value }
         override fun remove(keys: List<String>) = true.also { keys.forEach(values::remove) }
     }

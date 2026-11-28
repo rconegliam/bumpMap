@@ -47,20 +47,23 @@ internal fun rememberSyncState(tokenVersion: Int = 0): SyncUiState {
 private fun syncMessage(context: Context, hasToken: Boolean, pending: PendingUploads, work: List<WorkInfo>): Int? {
     if (!hasToken) return if (pending.trips > 0) R.string.sync_off else null
     if (work.any { it.state == WorkInfo.State.RUNNING }) return R.string.sync_running
+    if (pending.trips == 0) return null
+    val waitingForConnection = if (RecordingSync.usesMobileData(context)) {
+        R.string.sync_waiting_network
+    } else {
+        R.string.sync_waiting_wifi
+    }
+    val waiting = work.filter { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED }
+    if (waiting.isNotEmpty()) {
+        return if (waiting.any { it.runAttemptCount > 0 }) R.string.sync_retrying else waitingForConnection
+    }
     val failure = work.firstNotNullOfOrNull { info ->
         info.outputData.getString(SYNC_OUTCOME)?.let { runCatching { ArchiveOutcome.valueOf(it) }.getOrNull() }
     }
-    when (failure) {
-        ArchiveOutcome.UNAUTHORIZED -> return R.string.sync_unauthorized
-        ArchiveOutcome.ARCHIVE_FULL -> if (pending.trips > 0) return R.string.sync_archive_full
-        ArchiveOutcome.REJECTED -> if (pending.trips > 0) return R.string.sync_rejected
-        else -> Unit
-    }
-    if (pending.trips == 0) return null
-    val waiting = work.firstOrNull { it.state == WorkInfo.State.ENQUEUED || it.state == WorkInfo.State.BLOCKED }
-    return when {
-        waiting != null && waiting.runAttemptCount > 0 -> R.string.sync_retrying
-        RecordingSync.usesMobileData(context) -> R.string.sync_waiting_network
-        else -> R.string.sync_waiting_wifi
+    return when (failure) {
+        ArchiveOutcome.UNAUTHORIZED -> R.string.sync_unauthorized
+        ArchiveOutcome.ARCHIVE_FULL -> R.string.sync_archive_full
+        ArchiveOutcome.REJECTED -> R.string.sync_rejected
+        else -> waitingForConnection
     }
 }

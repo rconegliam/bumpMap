@@ -24,7 +24,6 @@ internal interface ArchiveApi {
 internal interface ArchiveCheckpoints {
     fun getInt(key: String): Int
     fun putInt(key: String, value: Int): Boolean
-    fun getBoolean(key: String): Boolean
     fun putBoolean(key: String, value: Boolean): Boolean
     fun remove(keys: List<String>): Boolean
 }
@@ -129,7 +128,6 @@ internal class RecordingArchiver(
             }
             if (status != HttpURLConnection.HTTP_OK) return status
         }
-        if (!checkpoints.putBoolean("$id/map-v1", true)) throw IOException("Map upload checkpoint")
         if (features.isNotEmpty()) onPublished()
         return HttpURLConnection.HTTP_NO_CONTENT
     }

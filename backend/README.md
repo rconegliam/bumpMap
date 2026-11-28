@@ -50,11 +50,11 @@ The returned `score` and `quality` are unchanged from the stored observation.
 
 ## Recording archives
 
-Configure the Android app with `BUMPMAP_API_TOKEN` from the Railway API service
-before recording. Android queues finished recordings already on the phone and
-future recordings. WorkManager resumes interrupted uploads and removes files
-after the archive and map uploads are confirmed. The archive includes the original
-GPS routes and sensor data. Android reads map data from the observation API.
+In Android **Settings → Server sync**, save `BUMPMAP_API_TOKEN` from the Railway
+API service before recording. Android queues finished recordings already on the
+phone and future recordings. WorkManager uses an unmetered connection by default,
+resumes interrupted uploads and removes files after the archive and map uploads
+are confirmed. The archive includes the original GPS routes and sensor data.
 
 The archive endpoint requires the same bearer token and accepts
 `application/octet-stream`. The recording ID is a stable UUID shared by its
