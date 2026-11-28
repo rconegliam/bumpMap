@@ -145,8 +145,8 @@ private val publicMapSql = """
     ), grouped AS (
         SELECT scored.id,
                COALESCE(AVG(speed) FILTER (WHERE event_type IS NULL), AVG(speed)) AS speed,
-               LEAST(SUM(potholes), 2147483647)::integer AS potholes,
-               LEAST(SUM(speed_bumps), 2147483647)::integer AS speed_bumps,
+               LEAST(COALESCE(SUM(potholes), 0), 2147483647)::integer AS potholes,
+               LEAST(COALESCE(SUM(speed_bumps), 0), 2147483647)::integer AS speed_bumps,
                BOOL_OR(event_type = 'pothole') AS mapped_pothole,
                BOOL_OR(event_type = 'speed_bump') AS mapped_speed_bump,
                ROUND(AVG(${roundPositive("base_penalty")} + potholes * 20::bigint + speed_bumps * 12::bigint))::bigint AS penalty

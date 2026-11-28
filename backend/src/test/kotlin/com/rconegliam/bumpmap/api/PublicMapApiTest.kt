@@ -40,7 +40,7 @@ class PublicMapApiTest {
         val independentEvent = Observation(
             type = "Feature",
             id = UUID.randomUUID().toString(),
-            geometry = Json.decodeFromString("""{"type":"Point","coordinates":[0.1003,0.1001]}"""),
+            geometry = Json.decodeFromString("""{"type":"Point","coordinates":[0.1103,0.1101]}"""),
             properties = ObservationProperties(
                 kind = "event", speedKmh = 22.0, eventType = "speed_bump", peak = 3.5,
                 recordingId = recordings[0].toString(),
@@ -52,10 +52,12 @@ class PublicMapApiTest {
                 connection.prepareStatement(
                     """
                     INSERT INTO map_street_ways (id, name, geom)
-                    VALUES (?, 'Fixture Way', ST_GeomFromText('LINESTRING(0.1 0.1, 0.101 0.1)', 4326))
+                    VALUES (?, 'Fixture Way', ST_GeomFromText('LINESTRING(0.1 0.1, 0.101 0.1)', 4326)),
+                           (?, 'Fixture Event Way', ST_GeomFromText('LINESTRING(0.11 0.11, 0.111 0.11)', 4326))
                     """.trimIndent(),
                 ).use {
                     it.setString(1, road)
+                    it.setString(2, "$road-events")
                     it.executeUpdate()
                 }
             }
@@ -116,6 +118,7 @@ class PublicMapApiTest {
                         segment.geometry,
                     )
                     val obstacles = page.features.filter { it.properties.kind == "event" }
+                    assertEquals(2, obstacles.size)
                     assertEquals(setOf("pothole", "speed_bump"), obstacles.map { it.properties.eventType }.toSet())
                     assertTrue(obstacles.none { it.geometry == independentEvent.geometry })
                     assertFalse(map.bodyAsText().contains("recording_id"))
@@ -143,8 +146,9 @@ class PublicMapApiTest {
                             it.executeUpdate()
                         }
                     }
-                    connection.prepareStatement("DELETE FROM map_street_ways WHERE id = ?").use {
+                    connection.prepareStatement("DELETE FROM map_street_ways WHERE id IN (?, ?)").use {
                         it.setString(1, road)
+                        it.setString(2, "$road-events")
                         it.executeUpdate()
                     }
                 }
