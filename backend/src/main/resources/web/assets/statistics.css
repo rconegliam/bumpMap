@@ -1,0 +1,82 @@
+.stats-panel {
+    min-width: 0;
+    padding: clamp(.8rem, 3vw, 1.15rem);
+    background: white;
+    border: 1px solid var(--edge);
+    border-radius: .9rem;
+    color: var(--ink);
+}
+
+.stats-note, .stats-status, .stats-location, .stats-unmeasured {
+    color: var(--subtle);
+    font-size: .88rem;
+}
+
+.stats-note { margin-block-start: .3rem; }
+.stats-status[data-error="true"] { color: #9a241f; font-weight: 650; }
+
+.stats-controls, .stats-toolbar, .stats-pages {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem 1rem;
+}
+
+.stats-controls { margin-block-start: 1rem; }
+.stats-controls label {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: .25rem;
+    min-width: 0;
+    font-size: .88rem;
+    font-weight: 700;
+}
+
+.stats-toolbar {
+    min-height: 2.5rem;
+    justify-content: space-between;
+    margin-block-start: .65rem;
+}
+
+.stats-pages { gap: .35rem; }
+.stats-controls select, .stats-pages button {
+    max-width: 100%;
+    padding: .4rem .6rem;
+    border: 1px solid #849e90;
+    border-radius: .45rem;
+    background: white;
+    color: var(--ink);
+    font: inherit;
+    font-size: .875rem;
+}
+
+.stats-pages button:hover:not([aria-disabled="true"]) {
+    border-color: var(--accent);
+    background: var(--wash);
+}
+
+.stats-pages button[aria-disabled="true"] {
+    color: var(--subtle);
+    background: var(--wash);
+    cursor: default;
+}
+
+.stats-results {
+    overflow-x: auto;
+    margin-block-start: .65rem;
+    border: 1px solid var(--edge);
+    border-radius: .45rem;
+}
+
+.stats-results table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.stats-results caption, .stats-results th, .stats-results td {
+    padding: .55rem .7rem;
+    text-align: start;
+}
+
+.stats-results caption { font-weight: 700; }
+.stats-results th, .stats-results td { border-top: 1px solid var(--edge); }
+.stats-results thead { background: var(--wash); }
+.stats-place { min-width: 9rem; overflow-wrap: anywhere; }
+.stats-location { display: block; font-weight: 400; }
+.stats-results .stats-number { text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
