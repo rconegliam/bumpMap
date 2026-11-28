@@ -74,9 +74,9 @@ internal class RecordingArchiver(
             }
             when (status) {
                 HttpURLConnection.HTTP_NO_CONTENT -> Unit
-                HttpURLConnection.HTTP_UNAUTHORIZED, HttpURLConnection.HTTP_FORBIDDEN -> return ArchiveOutcome.UNAUTHORIZED
+                HttpURLConnection.HTTP_FORBIDDEN -> return ArchiveOutcome.UNAUTHORIZED
                 HTTP_INSUFFICIENT_STORAGE -> archiveFull = true
-                HTTP_CANCELLED, HttpURLConnection.HTTP_PRECON_FAILED, HTTP_TOO_MANY_REQUESTS,
+                HTTP_CANCELLED, HttpURLConnection.HTTP_UNAUTHORIZED, HttpURLConnection.HTTP_PRECON_FAILED, HTTP_TOO_MANY_REQUESTS,
                 in 500..599 -> return ArchiveOutcome.RETRY
                 else -> rejected = true
             }

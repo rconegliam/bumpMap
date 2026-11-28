@@ -193,9 +193,9 @@ class RecordingArchiverTest {
     }
 
     @Test
-    fun rejectedTokenStopsWithoutDeleting() {
+    fun forbiddenUploadStopsWithoutDeleting() {
         val files = recording("bumpmap_20261128_100000")
-        server.putStatus = { _, _ -> 401 }
+        server.putStatus = { _, _ -> 403 }
 
         assertEquals(ArchiveOutcome.UNAUTHORIZED, archiver().run(files))
         assertTrue(files.all { it.exists() })
@@ -267,7 +267,7 @@ class RecordingArchiverTest {
         val files = recording("bumpmap_20261128_100000")
         server.putStatus = { _, _ -> 401 }
 
-        assertEquals(ArchiveOutcome.UNAUTHORIZED, archiver().run(files))
+        assertEquals(ArchiveOutcome.RETRY, archiver().run(files))
         assertTrue(files.all { it.exists() })
         assertEquals(listOf(INSTALLATION), server.registrations)
 
