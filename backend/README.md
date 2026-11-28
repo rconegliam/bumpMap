@@ -41,9 +41,12 @@ same bounding box and `after` pagination rules as the legacy endpoint.
 `next_cursor` is present only when there is another page.
 Features have `type`, `id`, `geometry`, and `properties` without
 `recording_id`. Each feature's properties include `kind` and `speed_kmh`.
-Scored segments have `quality`, `score`, `roughness`, `potholes`,
+Scored segments have `quality`, `score`, `roughness` (when available), `potholes`,
 `speed_bumps`, `map_quality` (`good`, `fair`, `poor`, or `bad`), and
 `penalty_points` (integer). Events have `type` and `peak` instead.
+Map penalties use the current Android pavement calibration from `roughness`
+(0.6 to 2.5), falling back to the stored `score` when roughness is absent.
+The returned `score` and `quality` are unchanged from the stored observation.
 
 ## Recording archives
 

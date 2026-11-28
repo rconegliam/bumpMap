@@ -81,11 +81,14 @@ private data class MapProperties(
 
 private fun mapObservation(feature: Observation): MapObservation {
     val properties = feature.properties
+    val pavementScore = properties.roughness?.let {
+        (100 * (1 - ((it - 0.6) / (2.5 - 0.6)).coerceIn(0.0, 1.0))).roundToInt()
+    } ?: properties.score
     val penaltyPoints = if (
         feature.geometry.type == "LineString" && properties.speedKmh.isFinite() && properties.speedKmh >= 0 &&
-        properties.score != null && properties.potholes != null && properties.speedBumps != null
+        pavementScore != null && properties.potholes != null && properties.speedBumps != null
     ) {
-        mapPenaltyPoints(properties.score, properties.speedKmh, properties.potholes, properties.speedBumps)
+        mapPenaltyPoints(pavementScore, properties.speedKmh, properties.potholes, properties.speedBumps)
     } else null
     return MapObservation(
         feature.type, feature.id, feature.geometry,
