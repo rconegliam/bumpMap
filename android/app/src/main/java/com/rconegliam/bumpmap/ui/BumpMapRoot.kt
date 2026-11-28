@@ -50,7 +50,7 @@ fun BumpMapRoot() {
         val modifier = Modifier.padding(padding)
         when (tab) {
             Tab.MAP -> MapScreen(modifier)
-            Tab.RECORD -> RecordScreen(modifier)
+            Tab.RECORD -> RecordScreen(modifier = modifier)
             Tab.SETTINGS -> SettingsScreen(modifier)
         }
     }

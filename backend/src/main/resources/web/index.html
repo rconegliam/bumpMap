@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="referrer" content="no-referrer">
+    <meta name="description" content="Consulte a qualidade do pavimento, buracos e lombadas detectados pelo BumpMap.">
+    <title>BumpMap — Mapa de qualidade das vias</title>
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" integrity="sha384-MinO0mNliZ3vwppuPOUnGa+iq619pfMhLVUXfC4LHwSCvF9H+6P/KO4Q7qBOYV5V" crossorigin="anonymous">
+    <link rel="stylesheet" href="/assets/app.css">
+    <link rel="stylesheet" href="/assets/routes.css">
+    <link rel="stylesheet" href="/assets/statistics.css">
+    <script defer src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js" integrity="sha384-SYKAG6cglRMN0RVvhNeBY0r3FYKNOJtznwA0v7B5Vp9tr31xAHsZC0DqkQ/pZDmj" crossorigin="anonymous"></script>
+    <script type="module" src="/assets/app.js"></script>
+</head>
+<body>
+    <header class="top">
+        <div class="wrap top-inner">
+            <a class="brand" href="/" aria-label="BumpMap"><span class="brand-icon" aria-hidden="true">↗</span>BumpMap</a>
+            <div class="languages" role="group" data-label="language" aria-label="Idioma">
+                <button type="button" data-language="pt-BR" lang="pt-BR" aria-label="Português (Brasil)" aria-pressed="true">PT-BR</button>
+                <button type="button" data-language="en" lang="en" aria-label="English" aria-pressed="false">EN</button>
+            </div>
+        </div>
+    </header>
+    <main class="wrap">
+        <section class="intro" aria-labelledby="title">
+            <h1 id="title" data-text="title">Qualidade das vias</h1>
+            <p class="intro-copy" data-text="intro">Explore os trechos medidos pelo BumpMap e veja onde foram detectados buracos e lombadas.</p>
+        </section>
+        <div class="views-bar">
+            <div class="views" role="tablist" data-label="views" aria-label="Consultas">
+                <button type="button" id="tab-map" role="tab" data-view="map" data-text="tabMap" aria-controls="view-map" aria-selected="true">Mapa</button>
+                <button type="button" id="tab-cities" role="tab" data-view="cities" data-text="tabCities" aria-controls="view-cities" aria-selected="false" tabindex="-1">Cidades</button>
+                <button type="button" id="tab-states" role="tab" data-view="states" data-text="tabStates" aria-controls="view-states" aria-selected="false" tabindex="-1">Estados</button>
+                <button type="button" id="tab-countries" role="tab" data-view="countries" data-text="tabCountries" aria-controls="view-countries" aria-selected="false" tabindex="-1">Países</button>
+                <button type="button" id="tab-rankings" role="tab" data-view="rankings" data-text="tabRankings" aria-controls="view-rankings" aria-selected="false" tabindex="-1">Rankings</button>
+            </div>
+            <button type="button" id="refresh" data-text="refresh">Atualizar</button>
+        </div>
+        <section class="board" id="view-map" role="tabpanel" aria-labelledby="tab-map">
+            <aside class="controls">
+                <fieldset>
+                    <legend data-text="filter">Exibir</legend>
+                    <div class="filters">
+                        <label><input type="radio" name="layer-filter" value="all" checked><span data-text="all">Todos</span></label>
+                        <label><input type="radio" name="layer-filter" value="pothole"><span data-text="potholePlural">Buracos</span></label>
+                        <label><input type="radio" name="layer-filter" value="speed_bump"><span data-text="bumpPlural">Lombadas</span></label>
+                    </div>
+                    <label class="toggle"><input id="speeds" type="checkbox"><span data-text="speeds">Mostrar velocidades</span></label>
+                </fieldset>
+                <div class="legend" aria-labelledby="legend">
+                    <h3 id="legend" data-text="legend">Legenda</h3>
+                    <ul>
+                        <li><span class="swatch good"></span><span data-text="good">Boa</span></li>
+                        <li><span class="swatch fair"></span><span data-text="fair">Regular</span></li>
+                        <li><span class="swatch poor"></span><span data-text="poor">Ruim</span></li>
+                        <li><span class="swatch bad"></span><span data-text="bad">Péssima</span></li>
+                        <li><span class="dot pothole"></span><span data-text="pothole">Buraco</span></li>
+                        <li><span class="dot speed_bump"></span><span data-text="speed_bump">Lombada</span></li>
+                    </ul>
+                </div>
+                <div id="route-planner"></div>
+            </aside>
+            <div class="map-panel">
+                <div class="map-bar">
+                    <p id="status" role="status" aria-live="polite">Carregando o mapa…</p>
+                </div>
+                <div id="map" role="region" data-label="map" aria-label="Mapa de qualidade das vias"></div>
+            </div>
+        </section>
+        <section class="statistics-panel" id="view-cities" role="tabpanel" aria-labelledby="tab-cities" tabindex="0" hidden></section>
+        <section class="statistics-panel" id="view-states" role="tabpanel" aria-labelledby="tab-states" tabindex="0" hidden></section>
+        <section class="statistics-panel" id="view-countries" role="tabpanel" aria-labelledby="tab-countries" tabindex="0" hidden></section>
+        <section class="statistics-panel" id="view-rankings" role="tabpanel" aria-labelledby="tab-rankings" tabindex="0" hidden></section>
+        <section class="about" id="map-about" aria-labelledby="about">
+            <h2 id="about" data-text="about">Como funciona</h2>
+            <p data-text="instructions">Mova o mapa ou aproxime o zoom para explorar outra área. As cores indicam a qualidade do pavimento nos trechos medidos, e os marcadores mostram a localização aproximada de buracos e lombadas. Selecione um trecho ou marcador para ver os detalhes.</p>
+            <noscript>Ative o JavaScript para usar o mapa. / Enable JavaScript to use the map.</noscript>
+        </section>
+    </main>
+    <footer class="wrap geography-credit">
+        <span data-text="geographyCredit">Dados geográficos</span>
+        <a href="https://www.openstreetmap.org/copyright" data-text="osmCredit">© colaboradores do OpenStreetMap</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://www.ibge.gov.br/geociencias/organizacao-do-territorio/malhas-territoriais/15774-malhas.html">IBGE</a>
+    </footer>
+</body>
+</html>

@@ -4,7 +4,6 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.pow
-import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
@@ -23,6 +22,8 @@ class RoadAnalyzer(
     private var stoppedAt: GeoPoint? = null
 
     private val segmentPoints = ArrayList<GeoPoint>()
+    private var segmentStartNs = 0L
+    private var segmentEndNs = 0L
     private var segmentLengthM = 0.0
     private var segmentSumSquares = 0.0
     private var segmentSamples = 0
@@ -101,8 +102,12 @@ class RoadAnalyzer(
             endSegment()
             return
         }
-        if (segmentPoints.isEmpty()) segmentPoints.add(segmentStart)
+        if (segmentPoints.isEmpty()) {
+            segmentPoints.add(segmentStart)
+            segmentStartNs = tNs - fixGapNs
+        }
         segmentPoints.add(point)
+        segmentEndNs = tNs
         segmentLengthM += distance
         segmentSumSquares += sumSquares
         segmentSamples += samples
@@ -135,6 +140,8 @@ class RoadAnalyzer(
                 roughness = roughness,
                 score = score(roughness),
                 quality = quality(roughness),
+                startNs = segmentStartNs,
+                endNs = segmentEndNs,
             ),
         )
     }
@@ -142,11 +149,8 @@ class RoadAnalyzer(
     fun roughness(rms: Double, speedMps: Double): Double =
         rms * (config.referenceSpeedMps / max(speedMps, config.minSegmentSpeedMps)).pow(config.speedExponent)
 
-    fun score(roughness: Double): Int {
-        val fraction = (roughness - config.scoreBestRoughness) /
-            (config.scoreWorstRoughness - config.scoreBestRoughness)
-        return (100 * (1 - fraction)).roundToInt().coerceIn(0, 100)
-    }
+    fun score(roughness: Double): Int =
+        pavementScore(roughness, config.scoreBestRoughness, config.scoreWorstRoughness)
 
     fun quality(roughness: Double): RoadQuality = when {
         roughness < config.goodBelow -> RoadQuality.GOOD

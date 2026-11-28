@@ -1,0 +1,70 @@
+.route-planner {
+    border-top: 1px solid var(--edge);
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+}
+
+.route-planner h3 { font-size: 1rem; }
+
+.route-planner-help,
+.route-planner-privacy,
+.route-planner-credit {
+    color: var(--subtle);
+    font-size: .8rem;
+    margin-block: .35rem .75rem;
+}
+
+.route-planner form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+    gap: .35rem;
+}
+.route-planner label:not(:first-child) { margin-block-start: .35rem; }
+
+.route-planner input {
+    border: 1px solid #849e90;
+    border-radius: .4rem;
+    min-width: 0;
+    padding: .42rem .55rem;
+    width: 100%;
+}
+
+.route-planner input[aria-invalid="true"] { border-color: #9a241f; }
+
+.route-planner button:not(.primary) {
+    background: #fff;
+    border: 1px solid var(--edge);
+    border-radius: .4rem;
+    color: var(--ink);
+    font-size: .8rem;
+    padding: .42rem .55rem;
+}
+
+.route-planner button[aria-pressed="true"] {
+    background: #f1ebfb;
+    border-color: #5033a3;
+    color: #3c2387;
+}
+
+.route-planner button:disabled,
+.route-planner input:disabled { opacity: .64; }
+.route-planner button:disabled { cursor: default; }
+
+.route-planner-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .4rem;
+    margin-block-start: .4rem;
+}
+
+.route-planner-status {
+    color: #3c2387;
+    font-size: .85rem;
+    font-weight: 600;
+    margin-block-start: .55rem;
+}
+
+.route-planner-status[data-error="true"] { color: #9a241f; }
+.route-planner-credit { margin-block-end: 0; }
+.route-planner-credit a { color: inherit; }

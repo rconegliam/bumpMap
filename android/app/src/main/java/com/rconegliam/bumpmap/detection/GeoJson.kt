@@ -6,16 +6,19 @@ import kotlin.math.roundToLong
 object GeoJson {
     fun feature(segment: RoadSegment): String {
         val coordinates = segment.points.joinToString(",") { "[${coord(it.lon)},${coord(it.lat)}]" }
+        val interval = if (segment.startNs != null && segment.endNs != null) {
+            ""","start_ns":${segment.startNs},"end_ns":${segment.endNs}"""
+        } else ""
         return """{"type":"Feature","geometry":{"type":"LineString","coordinates":[$coordinates]},""" +
             """"properties":{"kind":"segment","quality":"${segment.quality.code}","score":${segment.score},""" +
-            """"roughness":${round2(segment.roughness)},"speed_kmh":${round2(segment.speedMps * 3.6)}}}"""
+            """"roughness":${round2(segment.roughness)},"speed_kmh":${round2(segment.speedMps * 3.6)}$interval}}"""
     }
 
     fun feature(event: RoadEvent): String =
         """{"type":"Feature","geometry":{"type":"Point","coordinates":""" +
             """[${coord(event.position.lon)},${coord(event.position.lat)}]},""" +
             """"properties":{"kind":"event","type":"${event.type.code}","peak":${round2(event.peak)},""" +
-            """"speed_kmh":${round2(event.speedMps * 3.6)}}}"""
+            """"speed_kmh":${round2(event.speedMps * 3.6)},"t_ns":${event.tNs}}}"""
 
     fun collection(features: List<String>): String =
         """{"type":"FeatureCollection","features":[${features.joinToString(",")}]}"""

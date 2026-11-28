@@ -37,6 +37,7 @@ import com.rconegliam.bumpmap.detection.GeoJson
 import com.rconegliam.bumpmap.detection.RoadAnalyzer
 import com.rconegliam.bumpmap.detection.RoadEvent
 import com.rconegliam.bumpmap.detection.RoadSegment
+import com.rconegliam.bumpmap.sync.RecordingSync
 import java.io.BufferedWriter
 import java.io.File
 
@@ -88,6 +89,7 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
     private var recording = false
 
     // Accessed only on the worker thread.
+    private var recordingFile: File? = null
     private var writer: BufferedWriter? = null
     private var detectionWriter: BufferedWriter? = null
     private var analyzer: RoadAnalyzer? = null
@@ -169,6 +171,7 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
 
         worker.post {
             resetCounters(gravitySensor != null)
+            recordingFile = file
             writer = file.bufferedWriter().apply {
                 writeHeader(this, startedAtMs, startedAtElapsedNs, accelerometer, gyroscope, gravitySensor)
             }
@@ -311,7 +314,6 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
         val out = detectionWriter ?: return
         out.appendLine(feature)
         out.flush()
-        DetectionStore.notifyChanged()
     }
 
     // Overridden explicitly: these have no default implementation before Android 11.
@@ -359,6 +361,12 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
         runCatching { detectionWriter?.close() }
         detectionWriter = null
         analyzer = null
+        recordingFile?.let { file ->
+            RecordingStore.finish(file)
+            RecordingSync.notifyPendingChanged()
+            RecordingSync.enqueue(this)
+        }
+        recordingFile = null
     }
 
     private fun writeHeader(

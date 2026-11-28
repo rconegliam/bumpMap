@@ -6,7 +6,16 @@
     <string name="tab_record">Record</string>
     <string name="tab_settings">Settings</string>
 
-    <string name="map_no_data">Record a drive to see road quality here. The shared map with everyone\'s drives comes next.</string>
+    <string name="map_no_data">No measured roads in this area yet.</string>
+    <string name="map_unavailable">Could not reach the BumpMap server. Move the map to try again.</string>
+    <string name="map_filter_all">All</string>
+    <string name="map_filter_potholes">Potholes</string>
+    <string name="map_filter_bumps">Speed bumps</string>
+    <string name="map_show_speed">Average speed</string>
+    <string name="map_zoom_for_more">Zoom in to see more shared roads.</string>
+    <string name="map_mean_speed_value">Average speed %1$.1f km/h</string>
+    <string name="map_obstacle_counts">Potholes %1$d · Speed bumps %2$d</string>
+    <string name="map_penalty_points">Penalty points %1$d</string>
 
     <string name="record_title">Drive recorder</string>
     <string name="record_description">Drive with the phone in a holder. BumpMap measures how much the car shakes, rates each stretch of road and detects potholes and speed bumps automatically.</string>
@@ -39,11 +48,14 @@
     <string name="mark_pothole">Pothole</string>
     <string name="mark_rough">Rough pavement</string>
 
-    <string name="recordings_title">Recordings</string>
-    <string name="recordings_empty">No recordings yet.</string>
-    <string name="recording_share">Share</string>
-    <string name="recording_delete">Delete</string>
-    <string name="recording_share_chooser">Share recording</string>
+    <string name="uploads_title">Server upload</string>
+    <plurals name="uploads_pending">
+        <item quantity="one">%1$d trip waiting for the server (%2$s)</item>
+        <item quantity="other">%1$d trips waiting for the server (%2$s)</item>
+    </plurals>
+    <string name="uploads_done">All trips are saved on the server.</string>
+    <string name="uploads_note">Each trip stays on this phone only until the server confirms it, then it is removed.</string>
+    <string name="uploads_retry">Retry now</string>
 
     <string name="permission_denied">Location permission is required to record drives.</string>
 
@@ -57,4 +69,15 @@
     <string name="settings_about">About</string>
     <string name="settings_version">Version %1$s</string>
     <string name="settings_map_data">Map data © OpenStreetMap contributors. Base map by OpenFreeMap.</string>
+    <string name="sync_title">Server sync</string>
+    <string name="sync_description">BumpMap automatically uploads finished drives to its server database and loads the shared map from all installations. Uploads include GPS routes, sensor readings, manual marks and automatic detections. Measured road sections, average speeds and detections appear on the shared map.</string>
+    <string name="sync_mobile_data">Upload over mobile data</string>
+    <string name="sync_mobile_data_description">Off: uploads wait for Wi-Fi or another unmetered network. Recordings use about 50 MB per hour.</string>
+    <string name="sync_waiting_wifi">Waiting for Wi-Fi to upload.</string>
+    <string name="sync_waiting_network">Waiting for a connection to upload.</string>
+    <string name="sync_running">Uploading to the server…</string>
+    <string name="sync_unauthorized">The server could not authorize this app installation. Your trips stay on this phone.</string>
+    <string name="sync_archive_full">The server archive is full. Your trips stay on this phone until there is space.</string>
+    <string name="sync_rejected">The server refused some trips. They stay on this phone and will be sent again on the next retry.</string>
+    <string name="sync_retrying">Upload interrupted. It will retry automatically.</string>
 </resources>

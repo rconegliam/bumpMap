@@ -38,7 +38,7 @@ class GeoJsonTest {
         val json = GeoJson.feature(RoadEvent(EventType.POTHOLE, 1, GeoPoint(-23.5, -46.8), 5.0, 7.456))
         assertEquals(
             """{"type":"Feature","geometry":{"type":"Point","coordinates":[-46.8,-23.5]},""" +
-                """"properties":{"kind":"event","type":"pothole","peak":7.46,"speed_kmh":18.0}}""",
+                """"properties":{"kind":"event","type":"pothole","peak":7.46,"speed_kmh":18.0,"t_ns":1}}""",
             json,
         )
         assertEquals("""{"type":"FeatureCollection","features":[a,b]}""", GeoJson.collection(listOf("a", "b")))
