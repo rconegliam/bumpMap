@@ -6,7 +6,9 @@
     <string name="tab_record">Gravar</string>
     <string name="tab_settings">Configurações</string>
 
-    <string name="map_no_data">Grave um trajeto para ver os trechos medidos aqui.</string>
+    <string name="map_no_data">Ainda não há trechos medidos nesta área.</string>
+    <string name="map_needs_token">Informe o token de acesso ao servidor em Configurações para ver o mapa compartilhado.</string>
+    <string name="map_unavailable">Não foi possível acessar o servidor do BumpMap. Mova o mapa para tentar de novo.</string>
     <string name="map_filter_all">Todos</string>
     <string name="map_filter_potholes">Buracos</string>
     <string name="map_filter_bumps">Lombadas</string>
@@ -48,11 +50,18 @@
     <string name="mark_pothole">Buraco</string>
     <string name="mark_rough">Pavimento ruim</string>
 
-    <string name="recordings_title">Gravações</string>
-    <string name="recordings_empty">Nenhuma gravação ainda.</string>
-    <string name="recording_share">Compartilhar</string>
-    <string name="recording_delete">Excluir</string>
-    <string name="recording_share_chooser">Compartilhar gravação</string>
+    <string name="record_needs_token">A gravação exige o servidor do BumpMap. Informe primeiro seu token de acesso em Configurações.</string>
+    <string name="record_open_settings">Abrir Configurações</string>
+
+    <string name="uploads_title">Envio ao servidor</string>
+    <plurals name="uploads_pending">
+        <item quantity="one">%1$d viagem aguardando o servidor (%2$s)</item>
+        <item quantity="many">%1$d viagens aguardando o servidor (%2$s)</item>
+        <item quantity="other">%1$d viagens aguardando o servidor (%2$s)</item>
+    </plurals>
+    <string name="uploads_done">Todas as viagens estão salvas no servidor.</string>
+    <string name="uploads_note">Cada viagem fica neste celular só até o servidor confirmar o recebimento; depois ela é removida.</string>
+    <string name="uploads_retry">Tentar agora</string>
 
     <string name="permission_denied">A permissão de localização é necessária para gravar trajetos.</string>
 
@@ -66,16 +75,26 @@
     <string name="settings_about">Sobre</string>
     <string name="settings_version">Versão %1$s</string>
     <string name="settings_map_data">Dados do mapa © colaboradores do OpenStreetMap. Mapa base por OpenFreeMap.</string>
-    <string name="sync_title">Sincronização de gravações</string>
-    <string name="sync_description">Envia as gravações salvas e futuras ao banco do piloto BumpMap por uma rede sem cobrança por dados. O envio inclui trajetos do GPS, leituras dos sensores, marcações manuais e detecções automáticas. Trechos medidos, velocidades médias e detecções aparecem no mapa compartilhado do piloto. Você pode desativar os próximos envios aqui.</string>
-    <string name="sync_token">Token de acesso ao piloto</string>
-    <string name="sync_enable">Ativar sincronização</string>
+    <string name="sync_title">Sincronização com o servidor (obrigatória)</string>
+    <string name="sync_description">O BumpMap salva todos os trajetos no banco de dados do servidor. A gravação e o mapa precisam de um token de acesso. O envio inclui trajetos do GPS, leituras dos sensores, marcações manuais e detecções automáticas. Trechos medidos, velocidades médias e detecções aparecem no mapa compartilhado.</string>
+    <string name="sync_token">Token de acesso ao servidor</string>
+    <string name="sync_save_token">Salvar token</string>
     <string name="sync_update_token">Atualizar token</string>
-    <string name="sync_disable">Desativar sincronização</string>
-    <string name="sync_off">Sincronização desativada</string>
-    <string name="sync_pending">Aguardando sincronização</string>
-    <string name="sync_running">Sincronizando gravações</string>
-    <string name="sync_failed">Falha na sincronização. Confira ou atualize o token do piloto.</string>
-    <string name="sync_archive_full">O arquivo do piloto está cheio. As gravações continuam salvas neste aparelho.</string>
-    <string name="sync_up_to_date">Gravações sincronizadas</string>
+    <string name="sync_remove_token">Remover token</string>
+    <string name="sync_checking">Verificando o token com o servidor…</string>
+    <string name="sync_token_saved">Token de acesso salvo. A gravação está liberada.</string>
+    <string name="sync_token_missing">Sem token de acesso. A gravação está desativada.</string>
+    <string name="sync_token_rejected">O servidor recusou este token. Confira e tente novamente.</string>
+    <string name="sync_token_unreachable">Não foi possível acessar o servidor para verificar o token. Conecte-se à internet e tente novamente.</string>
+    <string name="sync_remove_warning">As viagens aguardando envio ficam neste celular até você salvar um token novamente.</string>
+    <string name="sync_mobile_data">Enviar pelos dados móveis</string>
+    <string name="sync_mobile_data_description">Desligado: o envio aguarda Wi-Fi ou outra rede sem cobrança por dados. As gravações usam cerca de 50 MB por hora.</string>
+    <string name="sync_off">O envio está pausado até um token de acesso ser salvo.</string>
+    <string name="sync_waiting_wifi">Aguardando Wi-Fi para enviar.</string>
+    <string name="sync_waiting_network">Aguardando conexão para enviar.</string>
+    <string name="sync_running">Enviando ao servidor…</string>
+    <string name="sync_unauthorized">O servidor recusou o token de acesso. Atualize-o em Configurações. Suas viagens continuam neste celular.</string>
+    <string name="sync_archive_full">O arquivo do servidor está cheio. Suas viagens continuam neste celular até haver espaço.</string>
+    <string name="sync_rejected">O servidor recusou algumas viagens. Elas continuam neste celular e serão reenviadas na próxima tentativa.</string>
+    <string name="sync_retrying">Envio interrompido. Ele será retomado automaticamente.</string>
 </resources>

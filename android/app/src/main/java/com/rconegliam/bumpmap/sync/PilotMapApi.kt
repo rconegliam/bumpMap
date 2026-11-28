@@ -5,15 +5,20 @@ import org.maplibre.geojson.FeatureCollection
 import com.google.gson.JsonParser
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import com.rconegliam.bumpmap.BuildConfig
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
-internal const val PILOT_API = "https://api-pilot-13fd93fa.up.railway.app"
 private const val OBSERVATIONS = "/v1/observations"
 private const val MAX_VIEWPORT_PAGES = 4
 
+// Tiny area in the Atlantic Ocean, used only to check that the server accepts a token.
+private const val TOKEN_CHECK_BBOX = "-30.001,-20.001,-30.0,-20.0"
+
 internal data class PilotViewport(val features: List<Feature>, val hasMore: Boolean)
+
+internal enum class TokenCheck { ACCEPTED, REJECTED, UNREACHABLE }
 
 internal object PilotMapApi {
     fun publish(features: List<Feature>, token: String): Int {
@@ -29,6 +34,36 @@ internal object PilotMapApi {
             } finally {
                 disconnect()
             }
+        }
+    }
+
+    fun putPart(path: String, bytes: ByteArray, token: String): Int =
+        connection(path, token).run {
+            try {
+                requestMethod = "PUT"
+                readTimeout = 30_000
+                doOutput = true
+                setRequestProperty("Content-Type", "application/octet-stream")
+                setFixedLengthStreamingMode(bytes.size)
+                outputStream.use { it.write(bytes) }
+                responseCode
+            } finally {
+                disconnect()
+            }
+        }
+
+    fun checkToken(token: String): TokenCheck {
+        val connection = connection("$OBSERVATIONS?bbox=$TOKEN_CHECK_BBOX", token)
+        return try {
+            when (connection.responseCode) {
+                HttpURLConnection.HTTP_OK -> TokenCheck.ACCEPTED
+                HttpURLConnection.HTTP_UNAUTHORIZED, HttpURLConnection.HTTP_FORBIDDEN -> TokenCheck.REJECTED
+                else -> TokenCheck.UNREACHABLE
+            }
+        } catch (_: IOException) {
+            TokenCheck.UNREACHABLE
+        } finally {
+            connection.disconnect()
         }
     }
 
@@ -54,7 +89,7 @@ internal object PilotMapApi {
     }
 
     private fun connection(path: String, token: String) =
-        (URL(PILOT_API + path).openConnection() as HttpURLConnection).apply {
+        (URL(BuildConfig.API_BASE_URL + path).openConnection() as HttpURLConnection).apply {
             connectTimeout = 10_000
             readTimeout = 15_000
             instanceFollowRedirects = false

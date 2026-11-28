@@ -147,7 +147,7 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
     @SuppressLint("MissingPermission")
     private fun startRecording() {
         if (recording) return
-        if (!hasLocationPermission(this)) {
+        if (!hasLocationPermission(this) || !RecordingSync.hasToken(this)) {
             stopSelf()
             return
         }
@@ -314,7 +314,6 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
         val out = detectionWriter ?: return
         out.appendLine(feature)
         out.flush()
-        DetectionStore.notifyChanged()
     }
 
     // Overridden explicitly: these have no default implementation before Android 11.
@@ -364,6 +363,7 @@ class RecorderService : Service(), SensorEventListener, LocationListener {
         analyzer = null
         recordingFile?.let { file ->
             RecordingStore.finish(file)
+            RecordingSync.notifyPendingChanged()
             RecordingSync.enqueue(this)
         }
         recordingFile = null

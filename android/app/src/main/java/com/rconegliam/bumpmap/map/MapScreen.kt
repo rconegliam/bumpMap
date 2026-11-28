@@ -40,7 +40,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.rconegliam.bumpmap.R
-import com.rconegliam.bumpmap.detection.DetectionStore
 import com.rconegliam.bumpmap.detection.EventType
 import com.rconegliam.bumpmap.detection.Geo
 import com.rconegliam.bumpmap.detection.MEAN_SPEED
@@ -53,6 +52,7 @@ import com.rconegliam.bumpmap.detection.labelRes
 import com.rconegliam.bumpmap.sync.PilotMapApi
 import com.rconegliam.bumpmap.sync.PilotViewport
 import com.rconegliam.bumpmap.sync.RecordingSync
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import com.rconegliam.bumpmap.ui.currentLocale
@@ -97,33 +97,35 @@ fun MapScreen(modifier: Modifier = Modifier) {
     val language = currentLocale().language
     val mapView = remember { MapView(context) }
     MapLifecycle(mapView)
-    val detectionsVersion by DetectionStore.version.collectAsStateWithLifecycle()
+    val publishedVersion by RecordingSync.publishedVersion.collectAsStateWithLifecycle()
     var loadedStyle by remember { mutableStateOf<Style?>(null) }
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
-    var localFeatures by remember { mutableStateOf<List<Feature>>(emptyList()) }
     var pilotViewport by remember { mutableStateOf<PilotViewport?>(null) }
+    var unavailable by remember { mutableStateOf(false) }
     var viewport by remember { mutableStateOf<String?>(null) }
     val token = RecordingSync.token(context)
     var filter by rememberSaveable { mutableStateOf(MapFilter.ALL) }
     var showSpeed by rememberSaveable { mutableStateOf(false) }
     var selection by remember { mutableStateOf<RoadMapMetrics?>(null) }
     val tapRadius = with(LocalDensity.current) { 12.dp.toPx() }
-    val features = remember(localFeatures, pilotViewport) {
-        (localFeatures + pilotViewport?.features.orEmpty()).distinctBy { it.id() }.onEach { feature ->
+    val features = remember(pilotViewport) {
+        pilotViewport?.features.orEmpty().distinctBy { it.id() }.onEach { feature ->
             RoadMapMetrics.from(feature)?.let { feature.addStringProperty(MAP_QUALITY, it.quality.code) }
         }
     }
 
-    LaunchedEffect(detectionsVersion) {
-        localFeatures = withContext(Dispatchers.IO) {
-            DetectionStore.loadMapFeatures(context, RecordingSync.installationId(context))
-        }
-    }
-    LaunchedEffect(token, viewport) {
+    // The server is the only source of road observations; nothing is read from local recordings.
+    LaunchedEffect(token, viewport, publishedVersion) {
         val bbox = viewport
-        pilotViewport = if (token == null || bbox == null) null else withContext(Dispatchers.IO) {
-            runCatching { PilotMapApi.readViewport(bbox, token) }.getOrNull()
+        if (token == null || bbox == null) {
+            pilotViewport = null
+            unavailable = false
+            return@LaunchedEffect
         }
+        val result = withContext(Dispatchers.IO) { runCatching { PilotMapApi.readViewport(bbox, token) } }
+        if (result.isFailure && result.exceptionOrNull() is CancellationException) return@LaunchedEffect
+        unavailable = result.isFailure
+        pilotViewport = result.getOrNull()
     }
     LaunchedEffect(loadedStyle, features) {
         loadedStyle?.getSourceAs<GeoJsonSource>(DETECTIONS_SOURCE)
@@ -166,14 +168,20 @@ fun MapScreen(modifier: Modifier = Modifier) {
                 }
             },
         )
-        if (features.isEmpty()) {
+        val notice = when {
+            token == null -> R.string.map_needs_token
+            unavailable -> R.string.map_unavailable
+            features.isEmpty() -> R.string.map_no_data
+            else -> null
+        }
+        if (notice != null) {
             Card(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(12.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.map_no_data),
+                    text = stringResource(notice),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(12.dp),
                 )

@@ -16,16 +16,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -36,7 +31,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -44,11 +38,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.work.ExistingWorkPolicy
 import com.rconegliam.bumpmap.R
 import com.rconegliam.bumpmap.detection.labelRes
+import com.rconegliam.bumpmap.sync.RecordingSync
+import com.rconegliam.bumpmap.sync.SyncUiState
+import com.rconegliam.bumpmap.sync.rememberSyncState
 import com.rconegliam.bumpmap.ui.currentLocale
 import kotlinx.coroutines.delay
-import java.io.File
 
 private fun requiredPermissions(): Array<String> = buildList {
     add(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -61,24 +58,18 @@ private fun allGranted(context: Context): Boolean = requiredPermissions().all {
 }
 
 @Composable
-fun RecordScreen(modifier: Modifier = Modifier) {
+fun RecordScreen(onOpenSettings: () -> Unit, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val status by RecorderState.status.collectAsStateWithLifecycle()
-    var recordings by remember { mutableStateOf(RecordingStore.list(context)) }
+    val sync = rememberSyncState()
     var permissionDenied by rememberSaveable { mutableStateOf(false) }
-
-    LaunchedEffect(status.isRecording, status.finishedCount) {
-        recordings = RecordingStore.list(context)
-    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) {
         permissionDenied = !RecorderService.hasLocationPermission(context)
-        if (!permissionDenied) RecorderService.start(context)
+        if (!permissionDenied && RecordingSync.hasToken(context)) RecorderService.start(context)
     }
-
-    val visibleRecordings = recordings.filter { !status.isRecording || it.name != status.fileName }
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -93,12 +84,27 @@ fun RecordScreen(modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
+        if (!sync.hasToken && !status.isRecording) {
+            item {
+                Card(
+                    Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                ) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.record_needs_token))
+                        Button(onClick = onOpenSettings) { Text(stringResource(R.string.record_open_settings)) }
+                    }
+                }
+            }
+        }
         item { StatusCard(status) }
         item {
             Button(
+                enabled = status.isRecording || sync.hasToken,
                 onClick = {
                     when {
                         status.isRecording -> RecorderService.stop(context)
+                        !RecordingSync.hasToken(context) -> onOpenSettings()
                         allGranted(context) -> RecorderService.start(context)
                         else -> permissionLauncher.launch(requiredPermissions())
                     }
@@ -122,24 +128,33 @@ fun RecordScreen(modifier: Modifier = Modifier) {
             item { MarkButtons(onMark = { RecorderService.mark(context, it) }) }
         }
         item {
-            Text(
-                stringResource(R.string.recordings_title),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 8.dp),
-            )
+            UploadCard(sync, onRetry = { RecordingSync.enqueue(context, ExistingWorkPolicy.REPLACE) })
         }
-        if (visibleRecordings.isEmpty()) {
-            item { Text(stringResource(R.string.recordings_empty)) }
-        } else {
-            items(visibleRecordings, key = { it.name }) { file ->
-                RecordingRow(
-                    file = file,
-                    onShare = { context.startActivity(RecordingStore.shareIntent(context, file)) },
-                    onDelete = {
-                        file.delete()
-                        recordings = RecordingStore.list(context)
-                    },
-                )
+    }
+}
+
+@Composable
+private fun UploadCard(sync: SyncUiState, onRetry: () -> Unit) {
+    val context = LocalContext.current
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(stringResource(R.string.uploads_title), style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (sync.pending.trips == 0) {
+                    stringResource(R.string.uploads_done)
+                } else {
+                    pluralStringResource(
+                        R.plurals.uploads_pending,
+                        sync.pending.trips,
+                        sync.pending.trips,
+                        Formatter.formatShortFileSize(context, sync.pending.bytes),
+                    )
+                },
+            )
+            sync.message?.let { Text(stringResource(it), style = MaterialTheme.typography.bodyMedium) }
+            Text(stringResource(R.string.uploads_note), style = MaterialTheme.typography.bodySmall)
+            if (sync.hasToken && sync.pending.trips > 0 && !sync.running) {
+                FilledTonalButton(onClick = onRetry) { Text(stringResource(R.string.uploads_retry)) }
             }
         }
     }
@@ -209,30 +224,6 @@ private fun MarkButtons(onMark: (MarkType) -> Unit) {
                 FilledTonalButton(onClick = { onMark(type) }, modifier = Modifier.weight(1f)) {
                     Text(stringResource(label), maxLines = 2)
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecordingRow(file: File, onShare: () -> Unit, onDelete: () -> Unit) {
-    val context = LocalContext.current
-    val details = DateUtils.formatDateTime(
-        context,
-        file.lastModified(),
-        DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME,
-    ) + " · " + Formatter.formatShortFileSize(context, file.length())
-    Card(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(file.name, style = MaterialTheme.typography.bodyMedium)
-                Text(details, style = MaterialTheme.typography.bodySmall)
-            }
-            IconButton(onClick = onShare) {
-                Icon(Icons.Filled.Share, contentDescription = stringResource(R.string.recording_share))
-            }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.recording_delete))
             }
         }
     }
