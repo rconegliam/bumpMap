@@ -21,6 +21,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.long
 
 class MapApiTest {
     @Test
@@ -93,6 +94,14 @@ class MapApiTest {
                 recordingId = recordingId, potholes = 2, speedBumps = 1,
             ),
         )
+        val calibratedSegments = listOf(0.61, 1.60, null).mapIndexed { index, roughness ->
+            segment.copy(
+                id = ids[index + 1],
+                properties = segment.properties.copy(
+                    speedKmh = 30.0, roughness = roughness, potholes = 0, speedBumps = 0,
+                ),
+            )
+        }
         val event = Observation(
             type = "Feature",
             id = ids.last(),
@@ -105,7 +114,8 @@ class MapApiTest {
             migrate(pool)
             val store = ObservationStore(pool)
             try {
-                assertTrue(store.save(listOf(segment) + ids.drop(1).map { event.copy(id = it) } + listOf(
+                val observations = listOf(segment) + calibratedSegments + ids.drop(4).map { event.copy(id = it) }
+                assertTrue(store.save(observations + listOf(
                     event.copy(id = unrecordedId, properties = event.properties.copy(recordingId = null)),
                     event.copy(id = outOfBoundsId, geometry = Json.decodeFromString(
                         """{"type":"Point","coordinates":[2.0,2.0]}""",
@@ -125,8 +135,16 @@ class MapApiTest {
                     val segmentProperties = features.first().getValue("properties").jsonObject
                     assertEquals(Json.parseToJsonElement("""
                         {"kind":"segment","speed_kmh":42.75,"quality":"good","score":70,"roughness":0.2,
-                        "potholes":2,"speed_bumps":1,"map_quality":"bad","penalty_points":62}
+                        "potholes":2,"speed_bumps":1,"map_quality":"bad","penalty_points":55}
                     """.trimIndent()), segmentProperties)
+                    assertEquals(
+                        listOf("good" to 5L, "fair" to 18L, "fair" to 13L),
+                        features.subList(1, 4).map {
+                            val properties = it.getValue("properties").jsonObject
+                            properties.getValue("map_quality").jsonPrimitive.content to
+                                properties.getValue("penalty_points").jsonPrimitive.long
+                        },
+                    )
                     val cursor = first.getValue("next_cursor").jsonPrimitive.content
                     assertEquals(ids[PAGE_SIZE - 1], cursor)
 
