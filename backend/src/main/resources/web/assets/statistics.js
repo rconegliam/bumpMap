@@ -18,8 +18,6 @@ const messages = {
         average_speed_kmh: "Velocidade média (km/h)", potholes: "Buracos",
         speed_bumps: "Lombadas", average_penalty_points: "Penalidade média (pontos)",
         notMeasured: "Sem medição", loading: "Carregando estatísticas…",
-        locked: "Informe um token para consultar as estatísticas.",
-        denied: "Token inválido ou sem permissão de leitura. Informe outro token.",
         malformed: "O serviço retornou estatísticas em um formato inesperado.",
         requestError: "Não foi possível carregar as estatísticas. Tente novamente.",
         empty: "Nenhuma medição disponível.", emptyPage: "Nenhum resultado nesta página.",
@@ -38,8 +36,6 @@ const messages = {
         average_speed_kmh: "Average speed (km/h)", potholes: "Potholes",
         speed_bumps: "Speed bumps", average_penalty_points: "Average penalty (points)",
         notMeasured: "Not measured", loading: "Loading statistics…",
-        locked: "Enter a token to view statistics.",
-        denied: "Token is invalid or lacks read permission. Enter another token.",
         malformed: "The statistics service returned data in an unexpected format.",
         requestError: "Could not load statistics. Try again.",
         empty: "No measurements available.", emptyPage: "No results on this page.",
@@ -48,7 +44,7 @@ const messages = {
     },
 };
 
-export function createStatistics(root, { onUnauthorized } = {}) {
+export function createStatistics(root) {
     const doc = root.ownerDocument;
     const element = (tag, className) => {
         const node = doc.createElement(tag);
@@ -100,11 +96,10 @@ export function createStatistics(root, { onUnauthorized } = {}) {
 
     let language = "pt-BR";
     let view;
-    let token = "";
     let offset = 0;
     let pending;
     let page;
-    let state = "locked";
+    let state = "loading";
     const t = key => messages[language][key];
     const level = () => view === "rankings" ? levelSelect.value : viewLevels[view];
 
@@ -167,7 +162,7 @@ export function createStatistics(root, { onUnauthorized } = {}) {
         if (state !== "loading") pages.hidden = !hasPrevious && !hasNext;
         previous.setAttribute("aria-disabled", String(!hasPrevious || state === "loading"));
         next.setAttribute("aria-disabled", String(!hasNext || state === "loading"));
-        status.dataset.error = String(["denied", "malformed", "requestError"].includes(state));
+        status.dataset.error = String(["malformed", "requestError"].includes(state));
         status.textContent = state === "loaded" ? t("range")(
             number.format(offset + 1), number.format(offset + count), number.format(page.total),
         ) : t(state);
@@ -184,9 +179,8 @@ export function createStatistics(root, { onUnauthorized } = {}) {
     async function load() {
         cancelRequest();
         page = undefined;
-        state = token ? "loading" : "locked";
+        state = "loading";
         render();
-        if (!token) return;
 
         const request = pending = new AbortController();
         const isCurrent = () => pending === request && !request.signal.aborted;
@@ -196,20 +190,16 @@ export function createStatistics(root, { onUnauthorized } = {}) {
             limit: pageSize,
             offset,
         });
-        let unauthorized = false;
         try {
-            const response = await fetch(`/v1/map/statistics?${params}`, {
-                headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+            const response = await fetch(`/v1/public/map/statistics?${params}`, {
+                headers: { Accept: "application/json" },
                 cache: "no-store",
                 credentials: "omit",
                 redirect: "error",
                 signal: request.signal,
             });
             if (!isCurrent()) return;
-            if (response.status === 401 || response.status === 403) {
-                state = "denied";
-                unauthorized = true;
-            } else if (!response.ok) {
+            if (!response.ok) {
                 state = "requestError";
             } else {
                 const data = await response.json().catch(() => null);
@@ -229,7 +219,6 @@ export function createStatistics(root, { onUnauthorized } = {}) {
             if (isCurrent()) pending = undefined;
         }
         render();
-        if (unauthorized) onUnauthorized?.();
     }
 
     function changePage(button, step) {
@@ -255,15 +244,14 @@ export function createStatistics(root, { onUnauthorized } = {}) {
         render();
     }
 
-    function show(nextView, nextToken) {
+    function show(nextView) {
         if (nextView !== "rankings" && !Object.hasOwn(viewLevels, nextView)) {
             hide();
             return;
         }
-        const value = nextToken ?? "";
-        if (view !== nextView || token !== value) offset = 0;
+        if (view === nextView) return;
+        offset = 0;
         view = nextView;
-        token = value;
         root.hidden = false;
         return load();
     }
@@ -272,13 +260,12 @@ export function createStatistics(root, { onUnauthorized } = {}) {
         cancelRequest();
         root.hidden = true;
         view = undefined;
-        token = "";
         offset = 0;
         page = undefined;
-        state = "locked";
+        state = "loading";
         render();
     }
 
     setLanguage(language);
-    return { show, setLanguage, hide };
+    return { show, setLanguage, hide, refresh: load };
 }

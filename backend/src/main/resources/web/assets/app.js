@@ -17,12 +17,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const collection = features => ({ type: "FeatureCollection", features });
 const boundedCoordinate = (value, max) => +Math.max(-max, Math.min(max, value)).toFixed(6);
 
-const form = document.querySelector("#access");
-const input = document.querySelector("#token");
-const session = document.querySelector("#session");
 const refresh = document.querySelector("#refresh");
-const disconnect = document.querySelector("#disconnect");
-const accessError = document.querySelector("#access-error");
 const status = document.querySelector("#status");
 const speedToggle = document.querySelector("#speeds");
 const filters = document.querySelectorAll("[name=layer-filter]");
@@ -30,22 +25,19 @@ const localeButtons = document.querySelectorAll("[data-language]");
 const tabs = [...document.querySelectorAll("[role=tab][data-view]")];
 const mapAbout = document.querySelector("#map-about");
 const statisticsRoot = document.createElement("div");
-const statistics = createStatistics(statisticsRoot, { onUnauthorized: () => lock("denied") });
+const statistics = createStatistics(statisticsRoot);
 
 let language = "pt-BR";
 let activeView = "map";
-let accessErrorKey = "";
 let map;
 let routePlanner;
 let mapReady = false;
-let mapFailed = false;
-let token = "";
 let filter = "all";
 let selected;
 let popup;
 let pending;
 let timer;
-let statusKey = "locked";
+let statusKey = "mapLoading";
 let statusError = false;
 
 const t = key => messages[language][key];
@@ -57,12 +49,6 @@ function showStatus(key, error = false) {
     statusError = error;
     status.textContent = t(key);
     status.dataset.error = String(error);
-}
-
-function showAccessError(key = "") {
-    accessErrorKey = key;
-    accessError.hidden = !key;
-    accessError.textContent = key ? t(key) : "";
 }
 
 function updateMapLabels() {
@@ -88,7 +74,6 @@ function setLanguage(value) {
     for (const node of document.querySelectorAll("[data-label]")) node.setAttribute("aria-label", t(node.dataset.label));
     for (const button of localeButtons) button.setAttribute("aria-pressed", String(button.dataset.language === value));
     showStatus(statusKey, statusError);
-    showAccessError(accessErrorKey);
     statistics.setLanguage(value);
     routePlanner?.setLanguage(value);
     if (popup && selected) popup.setDOMContent(details(selected));
@@ -139,8 +124,8 @@ async function getPage(bbox, after, signal) {
     if (after) params.set("after", after);
     let response;
     try {
-        response = await fetch(`/v1/map/observations?${params}`, {
-            headers: { Authorization: `Bearer ${token}`, Accept: "application/geo+json, application/json" },
+        response = await fetch(`/v1/public/map/observations?${params}`, {
+            headers: { Accept: "application/geo+json, application/json" },
             cache: "no-store",
             credentials: "omit",
             redirect: "error",
@@ -149,7 +134,6 @@ async function getPage(bbox, after, signal) {
     } catch {
         throw new Error("networkError");
     }
-    if (response.status === 401 || response.status === 403) throw new Error("denied");
     if (response.status === 429) throw new Error("rateLimit");
     if (response.status >= 500) throw new Error("serverError");
     if (!response.ok) throw new Error("requestError");
@@ -178,24 +162,9 @@ function clearMap() {
     map?.getSource(source)?.setData(collection([]));
 }
 
-function lock(key = "locked") {
-    token = "";
-    input.value = "";
-    form.hidden = false;
-    session.hidden = true;
-    showAccessError(key === "locked" ? "" : key);
-    routePlanner?.setToken("");
-    cancelRequest();
-    clearMap();
-    if (mapFailed) showStatus("mapError", true);
-    else showStatus("locked");
-    if (activeView !== "map") statistics.show(activeView, token);
-    if (key === "denied") input.focus();
-}
-
 async function loadViewport() {
     cancelRequest();
-    if (!token || !mapReady || activeView !== "map") return;
+    if (!mapReady || activeView !== "map") return;
     const { bbox, error } = viewportBox();
     if (error) {
         showStatus(error, error !== "zoom");
@@ -224,11 +193,7 @@ async function loadViewport() {
         showStatus(after ? "limited" : features.size ? "loaded" : "empty");
     } catch (error) {
         if (pending !== request) return;
-        if (error.message === "denied") {
-            lock("denied");
-        } else {
-            showStatus(Object.hasOwn(messages[language], error.message) ? error.message : "requestError", true);
-        }
+        showStatus(Object.hasOwn(messages[language], error.message) ? error.message : "requestError", true);
     } finally {
         if (pending === request) pending = undefined;
     }
@@ -330,7 +295,6 @@ function addObservationLayers() {
 
 function initMap() {
     if (!window.maplibregl) {
-        mapFailed = true;
         showStatus("mapError", true);
         return;
     }
@@ -341,7 +305,6 @@ function initMap() {
             renderWorldCopies: false, dragRotate: false, pitchWithRotate: false,
         });
     } catch {
-        mapFailed = true;
         showStatus("mapError", true);
         return;
     }
@@ -349,47 +312,42 @@ function initMap() {
     updateMapLabels();
     map.on("error", () => {
         if (!mapReady) {
-            mapFailed = true;
             showStatus("mapError", true);
         }
     });
     map.on("load", () => {
         addObservationLayers();
         mapReady = true;
-        mapFailed = false;
         routePlanner = createRoutePlanner({
             root: document.querySelector("#route-planner"),
             map,
-            onUnauthorized: () => lock("denied"),
         });
         routePlanner.setLanguage(language);
-        routePlanner.setToken(token);
         updateLayers();
         updateMapLabels();
-        if (token) loadViewport();
-        else if (statusKey === "mapError") showStatus("locked");
+        loadViewport();
     });
     map.on("movestart", () => {
         cancelRequest();
-        if (!token || !mapReady || activeView !== "map") return;
+        if (!mapReady || activeView !== "map") return;
         clearMap();
         showStatus("moving");
     });
     map.on("moveend", () => {
-        if (token && mapReady && activeView === "map") {
+        if (mapReady && activeView === "map") {
             clearTimeout(timer);
             timer = setTimeout(loadViewport, 250);
         }
     });
     map.on("click", event => {
-        if (!token || !mapReady) return;
+        if (!mapReady) return;
         if (routePlanner?.handleMapClick(event)) popup?.remove();
         else inspect(event);
     });
     map.on("mousemove", event => {
         if (!mapReady) return;
         const cursor = routePlanner?.isPicking?.() ? "crosshair" :
-            token && queryFeatures(event.point).length ? "pointer" : "";
+            queryFeatures(event.point).length ? "pointer" : "";
         map.getCanvas().style.cursor = cursor;
     });
 }
@@ -411,38 +369,18 @@ function switchView(view) {
     } else {
         cancelRequest();
         document.getElementById(`view-${view}`).append(statisticsRoot);
-        statistics.show(view, token);
+        statistics.show(view);
     }
 }
 
-form.addEventListener("submit", event => {
-    event.preventDefault();
-    const value = input.value.trim();
-    input.value = "";
-    if (!/^[\x21-\x7e]+$/.test(value)) {
-        showAccessError("invalidToken");
-        input.focus();
-        return;
-    }
-    token = value;
-    showAccessError();
-    form.hidden = true;
-    session.hidden = false;
-    refresh.focus();
-    routePlanner?.setToken(token);
-    if (activeView !== "map") statistics.show(activeView, token);
-    else if (mapReady) loadViewport();
-    else if (!mapFailed) showStatus("mapLoading");
-});
 refresh.addEventListener("click", () => {
     if (activeView !== "map") {
-        statistics.show(activeView, token);
+        statistics.refresh();
         return;
     }
     clearMap();
     loadViewport();
 });
-disconnect.addEventListener("click", () => { lock(); input.focus(); });
 speedToggle.addEventListener("change", updateLayers);
 for (const control of filters) {
     control.addEventListener("change", () => {
@@ -468,6 +406,6 @@ for (const [index, tab] of tabs.entries()) {
         tabs[next].focus();
     });
 }
-window.addEventListener("pagehide", () => lock());
-
 initMap();
+document.querySelector("#view-cities").append(statisticsRoot);
+statistics.show("cities");
