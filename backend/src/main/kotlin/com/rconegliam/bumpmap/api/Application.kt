@@ -51,13 +51,22 @@ fun main() {
     databasePool(env).use { pool ->
         migrate(pool)
         embeddedServer(Netty, host = "0.0.0.0", port = env["PORT"]?.toInt() ?: 8080) {
-            bumpMapApi(ObservationStore(pool), RecordingStore(pool, archiveLimit), token)
+            bumpMapApi(ObservationStore(pool), RecordingStore(pool, archiveLimit), token, env["BUMPMAP_MAP_READ_TOKEN"])
         }.start(wait = true)
     }
 }
 
-internal fun Application.bumpMapApi(store: ObservationStore, recordings: RecordingStore, token: String) {
+internal fun Application.bumpMapApi(
+    store: ObservationStore,
+    recordings: RecordingStore,
+    token: String,
+    mapReadToken: String? = null,
+) {
     val tokenBytes = token.toByteArray()
+    val mapReadDigest = mapReadToken?.takeUnless(String::isBlank)?.let(::mapTokenDigest)
+    require(mapReadDigest == null || !MessageDigest.isEqual(mapReadDigest, mapTokenDigest(token))) {
+        "BUMPMAP_MAP_READ_TOKEN must differ from BUMPMAP_API_TOKEN"
+    }
     val logger = environment.log
     install(ContentNegotiation) {
         json(Json)
@@ -68,6 +77,14 @@ internal fun Application.bumpMapApi(store: ObservationStore, recordings: Recordi
             authenticate { credential ->
                 if (MessageDigest.isEqual(tokenBytes, credential.token.toByteArray())) UserIdPrincipal("pilot")
                 else null
+            }
+        }
+        bearer("map-read") {
+            realm = "bumpmap-map"
+            authenticate { credential ->
+                if (mapReadDigest != null && MessageDigest.isEqual(mapReadDigest, mapTokenDigest(credential.token))) {
+                    UserIdPrincipal("map-reader")
+                } else null
             }
         }
     }
@@ -88,6 +105,8 @@ internal fun Application.bumpMapApi(store: ObservationStore, recordings: Recordi
     }
 
     routing {
+        websiteRoutes()
+        mapRoutes(store)
         get("/health") {
             call.response.header(HttpHeaders.CacheControl, "no-store")
             if (withContext(Dispatchers.IO) { store.ready() }) {
@@ -189,7 +208,7 @@ private class GeoJsonConverter(private val json: ContentConverter) : ContentConv
 }
 
 @Serializable
-private data class ApiError(val error: String)
+internal data class ApiError(val error: String)
 
 @Serializable
 private data class AcceptedObservations(val accepted: Int)
