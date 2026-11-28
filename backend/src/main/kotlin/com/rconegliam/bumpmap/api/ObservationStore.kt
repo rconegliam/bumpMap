@@ -7,6 +7,8 @@ import kotlinx.serialization.json.Json
 internal class ObservationStore(private val database: DataSource) {
     fun ready(): Boolean = database.connection.use { it.isValid(2) }
 
+    fun mapStatistics(query: MapStatisticsQuery): MapStatisticsPage = database.readMapStatistics(query)
+
     fun save(features: List<Observation>): Boolean {
         val json = Json.encodeToString(features)
         return database.connection.use { connection ->
