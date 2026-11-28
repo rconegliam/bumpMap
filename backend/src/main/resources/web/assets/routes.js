@@ -59,7 +59,7 @@ const copy = {
 
 const sides = ["from", "to"];
 const sourceId = "planned-car-route";
-const routeUrl = "/v1/map/route";
+const routeUrl = "/v1/public/map/route";
 const errorCodes = new Set([
     "route_too_far", "route_not_found", "route_busy", "routing_disabled",
     "route_provider_unavailable", "route_provider_timeout", "route_provider_error",
@@ -154,9 +154,9 @@ function fitRoute(map, coordinates) {
 /**
  * Mount once after the existing MapLibre style has loaded. The host owns the shared map click
  * and cursor handlers. Call handleMapClick(event) before inspecting observations and use
- * isPicking() to give the crosshair priority on mousemove. Pass an empty token when locking.
+ * isPicking() to give the crosshair priority on mousemove.
  */
-export function createRoutePlanner({ root, map, onUnauthorized }) {
+export function createRoutePlanner({ root, map }) {
     root.classList.add("route-planner");
     root.innerHTML = `
         <h3 data-route-text="title"></h3>
@@ -194,7 +194,6 @@ export function createRoutePlanner({ root, map, onUnauthorized }) {
     const labels = root.querySelectorAll("[data-route-text]");
     addRouteLayers(map);
 
-    let token = "";
     let language = "pt-BR";
     let picking = null;
     let route = null;
@@ -221,7 +220,6 @@ export function createRoutePlanner({ root, map, onUnauthorized }) {
 
     function render() {
         const text = copy[language];
-        root.hidden = !token;
         credit.hidden = !config?.enabled;
         privacy.hidden = !config?.external;
         for (const side of sides) {
@@ -274,19 +272,12 @@ export function createRoutePlanner({ root, map, onUnauthorized }) {
 
     function request(url, signal) {
         return fetch(url, {
-            headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+            headers: { Accept: "application/json" },
             credentials: "omit",
             cache: "no-store",
             redirect: "error",
             signal,
         });
-    }
-
-    function denied(response) {
-        if (response.status !== 401 && response.status !== 403) return false;
-        setToken("");
-        onUnauthorized?.();
-        return true;
     }
 
     async function loadConfig() {
@@ -297,7 +288,7 @@ export function createRoutePlanner({ root, map, onUnauthorized }) {
         render();
         try {
             const response = await request(`${routeUrl}/config`, controller.signal);
-            if (configRequest !== controller || denied(response)) return;
+            if (configRequest !== controller) return;
             if (!response.ok) throw new Error("configError");
             const value = await response.json();
             if (configRequest !== controller) return;
@@ -339,7 +330,7 @@ export function createRoutePlanner({ root, map, onUnauthorized }) {
         try {
             const params = new URLSearchParams({ from: encodePoint(from), to: encodePoint(to) });
             const response = await request(`${routeUrl}?${params}`, controller.signal);
-            if (routeRequest !== controller || denied(response)) return;
+            if (routeRequest !== controller) return;
             const value = await response.json();
             if (routeRequest !== controller) return;
             if (!response.ok) throw new Error(value?.error);
@@ -359,17 +350,6 @@ export function createRoutePlanner({ root, map, onUnauthorized }) {
         }
     }
 
-    function setToken(value) {
-        const next = value || "";
-        if (next === token) return;
-        configRequest?.abort();
-        configRequest = null;
-        config = null;
-        token = next;
-        clear();
-        if (token) void loadConfig();
-    }
-
     function setLanguage(value) {
         language = value === "en" ? "en" : "pt-BR";
         for (const label of labels) label.textContent = copy[language][label.dataset.routeText];
@@ -377,7 +357,7 @@ export function createRoutePlanner({ root, map, onUnauthorized }) {
     }
 
     function isPicking() {
-        return !!picking && !!token && !root.closest("[hidden]");
+        return !!picking && !root.closest("[hidden]");
     }
 
     function handleMapClick(event) {
@@ -396,7 +376,7 @@ export function createRoutePlanner({ root, map, onUnauthorized }) {
 
     form.addEventListener("submit", event => {
         event.preventDefault();
-        if (!token || configRequest || routeRequest) return;
+        if (configRequest || routeRequest) return;
         if (!config) void loadConfig();
         else if (config.enabled) void lookup();
     });
@@ -422,5 +402,6 @@ export function createRoutePlanner({ root, map, onUnauthorized }) {
     root.addEventListener("keydown", cancelPicking);
     map.getCanvas().addEventListener("keydown", cancelPicking);
     setLanguage(language);
-    return { setToken, setLanguage, isPicking, handleMapClick };
+    void loadConfig();
+    return { setLanguage, isPicking, handleMapClick };
 }
