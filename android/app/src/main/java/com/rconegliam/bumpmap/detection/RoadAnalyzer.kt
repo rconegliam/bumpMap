@@ -4,7 +4,6 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.pow
-import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
@@ -150,11 +149,8 @@ class RoadAnalyzer(
     fun roughness(rms: Double, speedMps: Double): Double =
         rms * (config.referenceSpeedMps / max(speedMps, config.minSegmentSpeedMps)).pow(config.speedExponent)
 
-    fun score(roughness: Double): Int {
-        val fraction = (roughness - config.scoreBestRoughness) /
-            (config.scoreWorstRoughness - config.scoreBestRoughness)
-        return (100 * (1 - fraction)).roundToInt().coerceIn(0, 100)
-    }
+    fun score(roughness: Double): Int =
+        pavementScore(roughness, config.scoreBestRoughness, config.scoreWorstRoughness)
 
     fun quality(roughness: Double): RoadQuality = when {
         roughness < config.goodBelow -> RoadQuality.GOOD

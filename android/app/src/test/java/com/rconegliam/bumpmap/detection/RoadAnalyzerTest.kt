@@ -239,10 +239,14 @@ class RoadAnalyzerTest {
     @Test
     fun scoreAndQualityThresholds() {
         assertEquals(100, analyzer.score(0.1))
+        assertEquals(100, analyzer.score(0.60))
+        assertEquals(99, analyzer.score(0.61))
         assertEquals(0, analyzer.score(5.0))
-        assertEquals(RoadQuality.GOOD, analyzer.quality(0.5))
-        assertEquals(RoadQuality.FAIR, analyzer.quality(0.8))
-        assertEquals(RoadQuality.POOR, analyzer.quality(1.2))
-        assertEquals(RoadQuality.BAD, analyzer.quality(2.0))
+        assertEquals(RoadQuality.GOOD, analyzer.quality(0.74))
+        assertEquals(RoadQuality.FAIR, analyzer.quality(0.75))
+        assertEquals(RoadQuality.FAIR, analyzer.quality(1.14))
+        assertEquals(RoadQuality.POOR, analyzer.quality(1.15))
+        assertEquals(RoadQuality.POOR, analyzer.quality(1.74))
+        assertEquals(RoadQuality.BAD, analyzer.quality(1.75))
     }
 }

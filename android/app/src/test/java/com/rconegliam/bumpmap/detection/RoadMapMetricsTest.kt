@@ -114,7 +114,11 @@ class RoadMapMetricsTest {
     private fun archivedSegment(roughness: Double): Feature {
         val start = GeoPoint(-23.53, -46.76)
         val end = start.copy(lon = -46.7597)
-        val analyzer = RoadAnalyzer(onSegment = {}, onEvent = {})
+        val analyzer = RoadAnalyzer(
+            config = DetectionConfig(goodBelow = 0.6, fairBelow = 1.0, poorBelow = 1.6, scoreBestRoughness = 0.3),
+            onSegment = {},
+            onEvent = {},
+        )
         val line = GeoJson.feature(RoadSegment(
             listOf(start, end), 30.0, 30.0 / 3.6, roughness * sqrt(30.0 / 40.0),
             roughness, analyzer.score(roughness), analyzer.quality(roughness),

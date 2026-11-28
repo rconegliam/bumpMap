@@ -1,5 +1,19 @@
 package com.rconegliam.bumpmap.detection
 
+import kotlin.math.roundToInt
+
+internal const val SMOOTH_ROUGHNESS = 0.6
+internal const val WORST_ROUGHNESS = 2.5
+
+internal fun pavementScore(
+    roughness: Double,
+    best: Double = SMOOTH_ROUGHNESS,
+    worst: Double = WORST_ROUGHNESS,
+): Int {
+    val fraction = ((roughness - best) / (worst - best)).coerceIn(0.0, 1.0)
+    return (100 * (1 - fraction)).roundToInt()
+}
+
 data class GeoPoint(val lat: Double, val lon: Double)
 
 enum class RoadQuality(val code: String) {
@@ -48,12 +62,12 @@ data class DetectionConfig(
     /** Shake is scaled to what it would be at this speed: roughness = rms * (ref / speed)^exponent. */
     val referenceSpeedMps: Double = 40 / 3.6,
     val speedExponent: Double = 0.5,
-    val goodBelow: Double = 0.6,
-    val fairBelow: Double = 1.0,
-    val poorBelow: Double = 1.6,
+    val goodBelow: Double = 0.75,
+    val fairBelow: Double = 1.15,
+    val poorBelow: Double = 1.75,
     /** Roughness that maps to score 100 and to score 0. */
-    val scoreBestRoughness: Double = 0.3,
-    val scoreWorstRoughness: Double = 2.5,
+    val scoreBestRoughness: Double = SMOOTH_ROUGHNESS,
+    val scoreWorstRoughness: Double = WORST_ROUGHNESS,
     val minEventSpeedMps: Double = 7 / 3.6,
     val maxBumpSpeedMps: Double = 50 / 3.6,
     /** Split between the slow body heave of a speed bump and the sharp jolt of a pothole. */
